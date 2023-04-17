@@ -12,6 +12,10 @@ class Pharmacy(models.Model):
 
     def __str__(self) -> str:
         return self.name
+    
+
+class Company(models.Model):
+    name = models.CharField(max_length=50)
 
 
 class Employee(models.Model):
@@ -55,10 +59,12 @@ class Medicine(models.Model):
     ]
 
     pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='medicines')
+    company = models.ForeignKey(Company,on_delete=models.PROTECT,related_name='medicines')
     brand_name = models.CharField(max_length=50)
     barcode = models.CharField(max_length=13)
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
+    is_active = models.BooleanField(default=1)
     type = models.CharField(max_length=2,choices=TYPE_CHOICES)
 
     def __str__(self) -> str:
@@ -77,17 +83,18 @@ class MedicineSubstance(models.Model):
     medicine = models.ForeignKey(Medicine,on_delete=models.CASCADE,related_name='medicine_substances')
 
 
-class Bill(models.Model):
+class Sale(models.Model):
     seller_name = models.CharField(max_length=100)
     time_stamp = models.DateTimeField(auto_now_add=True)
+    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
 
     def __str__(self) -> str:
         return self.seller_name
 
 
-class BillItem(models.Model):
+class SaleItem(models.Model):
     medicine = models.ForeignKey(Medicine,on_delete=models.PROTECT,related_name='bill_items')
-    bill = models.ForeignKey(Bill,on_delete=models.PROTECT,related_name='items')
+    bill = models.ForeignKey(Sale,on_delete=models.PROTECT,related_name='items')
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
 
@@ -95,6 +102,7 @@ class BillItem(models.Model):
 class Purchase(models.Model):
     reciver_name = models.CharField(max_length=100)
     time_stamp = models.DateTimeField(auto_now_add=True)
+    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
 
     def __str__(self) -> str:
         return self.reciver_name
