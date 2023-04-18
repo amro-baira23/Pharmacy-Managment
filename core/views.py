@@ -18,11 +18,11 @@ class MedicineListCreateAPIView(generics.ListCreateAPIView):
         return Medicine.objects.all().filter(pharmacy=self.kwargs['pk'])
     
     def perform_create(self, serializer):
-        m = Medicine.objects.create(pharmacy_id=self.kwargs['pk'],brand_name=serializer.data['brand_name'],
+        medicine = Medicine.objects.create(pharmacy_id=self.kwargs['pk'],brand_name=serializer.data['brand_name'],
             quantity=serializer.data['quantity'],company_id=serializer.data['company'],price=serializer.data['price'],
             type=serializer.data['type'],barcode=serializer.data['barcode'])
         
-        return {'message':'purchase created'}
+        return medicine
     
 
 class PurchaseListCreateAPIView(generics.ListCreateAPIView):
