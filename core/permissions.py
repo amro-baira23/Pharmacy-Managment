@@ -1,5 +1,8 @@
 from rest_framework import permissions
 from core.models import Pharmacy,Employee
+
+
+
 class isMember(permissions.BasePermission):
     def has_permission(self, request, view):
         pharma = Pharmacy.objects.get(id=view.kwargs['pk'])
@@ -9,7 +12,3 @@ class isMember(permissions.BasePermission):
         is_employee = Employee.objects.filter(pharmacy_id=view.kwargs['pk'],user_id=request.user_id).exists()
         
         return is_employee
-
-    def has_object_permission(self, request, view, obj):
-        print('hi')
-        return False
