@@ -20,3 +20,4 @@ class MedicineListCreateAPIView(generics.ListCreateAPIView):
 
 
 
+    
