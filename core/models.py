@@ -1,5 +1,7 @@
 from django.db import models
+from django.core.validators import MinLengthValidator
 from django.conf import settings
+from .validators import validate_old_date
 
 User = settings.AUTH_USER_MODEL
 
@@ -8,7 +10,7 @@ class Pharmacy(models.Model):
     name = models.CharField(max_length=50)
     city = models.CharField(max_length=50)
     street = models.CharField(max_length=50)
-    phone_number = models.CharField(max_length=10)
+    phone_number = models.CharField(max_length=10,validators=[MinLengthValidator(10)],unique=True)
 
     def __str__(self) -> str:
         return self.name
@@ -16,6 +18,10 @@ class Pharmacy(models.Model):
 
 class Company(models.Model):
     name = models.CharField(max_length=50)
+    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = [['name', 'pharmacy']]
 
 
 class Employee(models.Model):
@@ -29,7 +35,7 @@ class Employee(models.Model):
 
     user = models.OneToOneField(User,on_delete=models.CASCADE)
     pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='employees')
-    phone_number = models.CharField(max_length=13)
+    phone_number = models.CharField(max_length=10,validators=[MinLengthValidator(10)],unique=True)
     salry = models.PositiveIntegerField()
     role = models.CharField(choices=ROLE_CHOICES,max_length=1,default=EMPLOYEE)
 
@@ -57,30 +63,40 @@ class Medicine(models.Model):
         (INHALERS, 'Inhalers'),
         (TOPICALS, 'Topicals')
     ]
-
-    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='medicines')
     company = models.ForeignKey(Company,on_delete=models.PROTECT,related_name='medicines')
     brand_name = models.CharField(max_length=50)
     barcode = models.CharField(max_length=13)
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
     is_active = models.BooleanField(default=1)
+    expiry_date = models.DateField(validators=[validate_old_date])
     type = models.CharField(max_length=2,choices=TYPE_CHOICES)
 
     def __str__(self) -> str:
         return self.brand_name
     
+    class Meta:
+        ordering = ['brand_name']
+        unique_together = [['company', 'type', 'brand_name', 'barcode']]
+    
 
 class Substance(models.Model):
     name = models.CharField(max_length=50)
+    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='substances')
 
     def __str__(self) -> str:
         return self.name
+    
+    class Meta:
+        unique_together = [['name','pharmacy']]
 
 
 class MedicineSubstance(models.Model):
     substance = models.ForeignKey(Substance,on_delete=models.PROTECT)
     medicine = models.ForeignKey(Medicine,on_delete=models.CASCADE,related_name='medicine_substances')
+
+    class Meta:
+        unique_together = [['substance','medicine']]
 
 
 class Sale(models.Model):
@@ -90,13 +106,19 @@ class Sale(models.Model):
 
     def __str__(self) -> str:
         return self.seller_name
+    
+    class Meta:
+        ordering = ['time_stamp']
 
 
 class SaleItem(models.Model):
     medicine = models.ForeignKey(Medicine,on_delete=models.PROTECT,related_name='bill_items')
-    bill = models.ForeignKey(Sale,on_delete=models.PROTECT,related_name='items')
+    sale = models.ForeignKey(Sale,on_delete=models.PROTECT,related_name='items')
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
+    
+    class Meta:
+        unique_together = [['medicine','sale']]
 
 
 class Purchase(models.Model):
@@ -107,9 +129,15 @@ class Purchase(models.Model):
     def __str__(self) -> str:
         return self.reciver_name
 
+    class Meta:
+        ordering = ['time_stamp']
+
 
 class PurchaseItem(models.Model):
     medicine = models.ForeignKey(Medicine,on_delete=models.PROTECT,related_name='purchase_items')
     purchase = models.ForeignKey(Purchase,on_delete=models.PROTECT,related_name='items')
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = [['medicine','purchase']]
