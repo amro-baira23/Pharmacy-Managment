@@ -8,18 +8,14 @@ from rest_framework import views, generics,authentication,permissions
 
 class MedicineListCreateAPIView(generics.ListCreateAPIView):
     queryset = Medicine.objects.all()
+    authentication_classes = [authentication.SessionAuthentication]
+    permission_classes = [isMember]
     serializer_class = MedicineSerializer
     # authentication_classes = [authentication.SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated, isMember]
     
     def get_queryset(self):
-        body = self.request.body
-        print('body: ',body)
-        qs = Medicine.objects.all().filter(pharmacy=self.kwargs['pk'])
-        if qs.exists():
-            return qs
-        else:
-            raise Exception("Such content doesn't exist") 
+        return Medicine.objects.all().filter(pharmacy=self.kwargs['pk'])
     
     def perform_create(self, serializer):
         m = Medicine.objects.create(pharmacy_id=self.kwargs['pk'],brand_name=serializer.data['brand_name'],

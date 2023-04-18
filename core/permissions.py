@@ -9,9 +9,6 @@ class isMember(permissions.BasePermission):
         if pharma.owner_id == request.user.id:
             return True
         
-
-        employees = Employee.objects.all().filter(pharmacy_id=view.kwargs['pk']).filter(id=request.user.id)
-        if employees.exists():
-            return True
-
-        return False
+        is_employee = Employee.objects.filter(pharmacy_id=view.kwargs['pk'],user_id=request.user_id).exists()
+        
+        return is_employee
