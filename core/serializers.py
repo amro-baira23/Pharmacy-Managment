@@ -45,3 +45,35 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
             'quantity',
             'price',
         ]
+
+
+class PharmacyListSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Pharmacy
+        fields = ['id','name']
+
+
+    def to_representation(self, instance):
+        return super().to_representation(instance)
+
+class PharmacySerializer(serializers.ModelSerializer):
+
+    owner = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Pharmacy
+        fields = ['owner','name','city','street','phone_number']
+
+    
+    def create(self, validated_data):
+        return Pharmacy.objects.create(owner_id=self.context['owner_id'],**validated_data)
+    
+
+class EmployeeListSerializer(serializers.ModelSerializer):
+
+    user = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = Employee
+        fields = ['user','role']

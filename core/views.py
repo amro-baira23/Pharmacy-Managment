@@ -1,17 +1,13 @@
-from django.shortcuts import render
 from .models import *
 from .serializers import *
 from .permissions import *
-from rest_framework import views, generics,authentication,permissions
-# Create your views here.
-
+from rest_framework import generics,authentication,permissions,viewsets
 
 class MedicineListCreateAPIView(generics.ListCreateAPIView):
     queryset = Medicine.objects.all()
     authentication_classes = [authentication.SessionAuthentication]
     permission_classes = [isMember]
     serializer_class = MedicineSerializer
-    # authentication_classes = [authentication.SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated, isMember]
     
     def get_queryset(self):
@@ -50,4 +46,28 @@ class PurchaseListCreateAPIView(generics.ListCreateAPIView):
             medicine.quantity -= item['quantity']
             medicine.save()
         return serializer
-  
+
+
+class PharmacyViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwner]
+
+    def get_queryset(self):
+        return Pharmacy.objects.filter(owner_id=self.request.user.id)
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return PharmacyListSerializer
+        return PharmacySerializer
+    
+    def get_serializer_context(self):
+        return {'owner_id':self.request.user.id}
+    
+
+class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
+    permission_classes = [PharmacyOwnerOrManager]
+
+    def get_queryset(self):
+        return Employee.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+    
+    def get_serializer_class(self):
+        return EmployeeListSerializer

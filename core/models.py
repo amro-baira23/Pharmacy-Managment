@@ -65,9 +65,10 @@ class Medicine(models.Model):
     ]
     company = models.ForeignKey(Company,on_delete=models.PROTECT,related_name='medicines')
     brand_name = models.CharField(max_length=50)
-    barcode = models.CharField(max_length=13)
+    barcode = models.CharField(max_length=13,validators=[MinLengthValidator(13)])
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
+    need_prescription = models.BooleanField()
     is_active = models.BooleanField(default=1)
     expiry_date = models.DateField(validators=[validate_old_date])
     type = models.CharField(max_length=2,choices=TYPE_CHOICES)
