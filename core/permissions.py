@@ -15,7 +15,7 @@ class PharmacyOwnerOrManager(permissions.BasePermission):
         if request.user and request.user.is_authenticated:
             id = view.kwargs.get("pharmacy_pk")
             return Pharmacy.objects.filter(Q(owner_id=request.user.id)|
-                                        Q(employees__id=request.user.id,employees__role='M'),
+                                        Q(employees__user_id=request.user.id,employees__role='M'),
                                         id=id).exists()
 
 

@@ -83,4 +83,4 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         user_id = self.get_object().user_id
         User.objects.get(id=user_id).delete()
-        return response.Response(status=201)
+        return response.Response(status=200)
