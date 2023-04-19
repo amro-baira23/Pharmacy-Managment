@@ -1,7 +1,7 @@
 from .models import *
 from .serializers import *
 from .permissions import *
-from rest_framework import generics,authentication,permissions,viewsets
+from rest_framework import generics,authentication,permissions,viewsets,response
 
 class MedicineListCreateAPIView(generics.ListCreateAPIView):
     queryset = Medicine.objects.all()
@@ -67,7 +67,20 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [PharmacyOwnerOrManager]
 
     def get_queryset(self):
-        return Employee.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+        return Employee.objects.select_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
     
     def get_serializer_class(self):
-        return EmployeeListSerializer
+        if self.action == 'list':
+            return EmployeeListSerializer
+        if self.action == 'create':
+            return EmployeeCreateSerializer
+        return EmployeeSerializer
+    
+    def get_serializer_context(self):
+        return {'pharmacy_pk':self.kwargs['pharmacy_pk']}
+    
+
+    def destroy(self, request, *args, **kwargs):
+        user_id = self.get_object().user_id
+        User.objects.get(id=user_id).delete()
+        return response.Response(status=201)

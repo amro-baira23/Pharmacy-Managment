@@ -5,6 +5,14 @@ from .validators import validate_old_date
 
 User = settings.AUTH_USER_MODEL
 
+EMPLOYEE = 'E'
+MANAGER = 'M'
+
+ROLE_CHOICES = [
+    (EMPLOYEE,'Employee'),
+    (MANAGER,'Manager'),
+    ]
+
 class Pharmacy(models.Model):
     owner = models.ForeignKey(User,on_delete=models.PROTECT,related_name='pharmacys')
     name = models.CharField(max_length=50)
@@ -25,14 +33,6 @@ class Company(models.Model):
 
 
 class Employee(models.Model):
-    EMPLOYEE = 'E'
-    MANAGER = 'M'
-
-    ROLE_CHOICES = [
-        (EMPLOYEE,'Employee'),
-        (MANAGER,'Manager'),
-    ]
-
     user = models.OneToOneField(User,on_delete=models.CASCADE)
     pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='employees')
     phone_number = models.CharField(max_length=10,validators=[MinLengthValidator(10)],unique=True)
@@ -63,12 +63,12 @@ class Medicine(models.Model):
         (INHALERS, 'Inhalers'),
         (TOPICALS, 'Topicals')
     ]
-    company = models.ForeignKey(Company,on_delete=models.PROTECT,related_name='medicines')
+    company = models.ForeignKey(Company,on_delete=models.PROTECT,related_name='medicines',null=True,blank=True)
     brand_name = models.CharField(max_length=50)
     barcode = models.CharField(max_length=13,validators=[MinLengthValidator(13)])
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
-    need_prescription = models.BooleanField()
+    need_prescription = models.BooleanField(default=0)
     is_active = models.BooleanField(default=1)
     expiry_date = models.DateField(validators=[validate_old_date])
     type = models.CharField(max_length=2,choices=TYPE_CHOICES)

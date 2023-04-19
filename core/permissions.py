@@ -12,10 +12,11 @@ class IsOwner(permissions.BasePermission):
 
 class PharmacyOwnerOrManager(permissions.BasePermission):
     def has_permission(self, request, view):
-        id = view.kwargs.get("pharmacy_pk")
-        return Pharmacy.objects.filter(Q(owner_id=request.user.id)|
-                                       Q(employees__id=request.user.id,employees__role='M'),
-                                       id=id).exists()
+        if request.user and request.user.is_authenticated:
+            id = view.kwargs.get("pharmacy_pk")
+            return Pharmacy.objects.filter(Q(owner_id=request.user.id)|
+                                        Q(employees__id=request.user.id,employees__role='M'),
+                                        id=id).exists()
 
 
 class isMember(permissions.BasePermission):
