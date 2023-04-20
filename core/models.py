@@ -64,6 +64,7 @@ class Medicine(models.Model):
         (TOPICALS, 'Topicals')
     ]
     company = models.ForeignKey(Company,on_delete=models.PROTECT,related_name='medicines',null=True,blank=True)
+    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='medicines')
     brand_name = models.CharField(max_length=50)
     barcode = models.CharField(max_length=13,validators=[MinLengthValidator(13)])
     quantity = models.PositiveIntegerField()
@@ -78,7 +79,7 @@ class Medicine(models.Model):
     
     class Meta:
         ordering = ['brand_name']
-        unique_together = [['company', 'type', 'brand_name', 'barcode']]
+        unique_together = [['company', 'pharmacy', 'type', 'brand_name', 'barcode']]
     
 
 class Substance(models.Model):

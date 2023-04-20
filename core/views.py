@@ -1,17 +1,17 @@
 from .models import *
 from .serializers import *
 from .permissions import *
-from rest_framework import generics,authentication,permissions,viewsets,response
+from rest_framework import generics,authentication,viewsets,response
 
 class MedicineListCreateAPIView(generics.ListCreateAPIView):
     queryset = Medicine.objects.all()
     authentication_classes = [authentication.SessionAuthentication]
     permission_classes = [isMember]
     serializer_class = MedicineSerializer
-    permission_classes = [permissions.IsAuthenticated, isMember]
+    permission_classes = [isMember]
     
     def get_queryset(self):
-        return Medicine.objects.all().filter(pharmacy=self.kwargs['pk'])
+        return Medicine.objects.filter(pharmacy=self.kwargs['pk'])
     
     def perform_create(self, serializer):
         medicine = Medicine.objects.create(pharmacy_id=self.kwargs['pk'],brand_name=serializer.data['brand_name'],
@@ -24,7 +24,7 @@ class MedicineListCreateAPIView(generics.ListCreateAPIView):
 class PurchaseListCreateAPIView(generics.ListCreateAPIView):
     queryset = Purchase.objects.all()
     serializer_class = PurchaseSerializer
-    permission_classes = [permissions.IsAuthenticated, isMember]
+    permission_classes = [isMember]
 
     def get_queryset(self):
         qs = Purchase.objects.all().filter(pharmacy=self.kwargs['pk'])
@@ -64,7 +64,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
     
 
 class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
-    permission_classes = [PharmacyOwnerOrManager]
+    permission_classes = [IsOwner]
 
     def get_queryset(self):
         return Employee.objects.select_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
