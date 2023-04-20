@@ -5,7 +5,7 @@ from rest_framework import generics,authentication,viewsets,response
 
 
 class MedicineViewset(viewsets.ModelViewSet):
-    # permission_classes = [isMember]
+    permission_classes = [isMember]
     serializer_class = MedicineSerializer
     
     def get_queryset(self):
@@ -30,8 +30,9 @@ class PurchaseViewset(viewsets.ModelViewSet):
             raise Exception("Purchase order can't be empty")
         instance = serializer.save(pharmacy_id = self.kwargs['pharmacy_pk'])
         purchase = Purchase.objects.get(id=instance.id)
-        item_serializer = PurchaseItemSerializer(data=items,many=True)
-        if  item_serializer.is_valid():
+        item_serializer = PurchaseItemSerializer(data=items,many=True,context={'purchase':instance})
+        if  item_serializer.is_valid(raise_exception=True):
+            
             item_serializer.save(purchase_id=purchase.id)
         serializer.save()
 

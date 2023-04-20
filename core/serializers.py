@@ -56,15 +56,16 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
             'quantity',
             'price',
         ]
-
- 
+        
+    def validate(self, attrs):
+        medicine = attrs['medicine']
+        purchase = self.context.get('purchase')
+        if not medicine.pharmacy.id is purchase.pharmacy.id:
+            raise serializers.ValidationError({'message':'unauthorized operation'})
+        return super().validate(attrs)
+    
     def create(self, validated_data):
         medicine = validated_data['medicine']
-        pharmacy = medicine.pharmacy
-        print('validated',validated_data)
-        purchase = Purchase.objects.get(id=validated_data['purchase_id'])
-        if not medicine.pharmacy.id is purchase.pharmacy:
-            raise Exception('unauthorized operation')
         quantity = validated_data['quantity']
         medicine.quantity += quantity
         medicine.save()
