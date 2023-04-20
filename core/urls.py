@@ -1,6 +1,5 @@
 from django.urls import path
 from .views import *
-from .viewsets import *
 
 
 from rest_framework_nested import routers
@@ -11,10 +10,12 @@ router.register('pharmacys',PharmacyViewSet,basename='pharmacya')
 employee_router = routers.NestedDefaultRouter(router,'pharmacys',lookup='pharmacy')
 employee_router.register('employee',PharmacyEmployeeViewSet,basename='pharmacy-employees')
 
-urls = router.urls + employee_router.urls
+medicine_router = routers.NestedDefaultRouter(router,'pharmacys',lookup='pharmacy')
+medicine_router.register('medicine',MedicineViewset,basename='pharmacy-medicine')
 
-urlpatterns = [
-    path('medicine/<int:pharmacy_id>/medicine/<int:medicine_id>',MedicineListCreateAPIView.as_view()),
-    path('pharmacy/<int:pharmacy_id>/purchase/',PurchaseListCreateAPIView.as_view()),
-    path('pharmacy/<int:pharmacy_id>/purchase/<int:pk>',PurchaseRetrieveDestroyUpdateAPIView.as_view()),
-] + urls
+purchase_router = routers.NestedDefaultRouter(router,'pharmacys',lookup='pharmacy')
+purchase_router.register('purchase',PurchaseViewset,basename='pharmacy-medicine')
+
+urls = router.urls + employee_router.urls + medicine_router.urls + purchase_router.urls
+
+urlpatterns = urls
