@@ -36,11 +36,10 @@ class PurchaseViewset(viewsets.ModelViewSet):
 
 
 class PharmacyViewSet(viewsets.ModelViewSet):
-    # permission_classes = [IsOwner]
+    permission_classes = [IsOwner]
 
     def get_queryset(self):
-        # return Pharmacy.objects.filter(owner_id=self.request.user.id)
-        return Pharmacy.objects.all()
+        return Pharmacy.objects.filter(owner_id=self.request.user.id)
 
     def get_serializer_class(self):
         if self.action == 'list':
