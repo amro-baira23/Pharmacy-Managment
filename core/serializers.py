@@ -138,7 +138,7 @@ class EmployeeListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Employee
-        fields = ['user','role']
+        fields = ['id','user','role']
 
 
 class EmployeeSerializer(serializers.ModelSerializer):

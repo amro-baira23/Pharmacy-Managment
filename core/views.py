@@ -1,7 +1,7 @@
 from .models import *
 from .serializers import *
 from .permissions import *
-from rest_framework import generics,authentication,viewsets,response
+from rest_framework import generics,authentication,viewsets,response,status
 
 
 class MedicineViewset(viewsets.ModelViewSet):
@@ -68,9 +68,17 @@ class PharmacyViewSet(viewsets.ModelViewSet):
     def get_serializer_context(self):
         return {'owner_id':self.request.user.id}
     
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        count = Pharmacy.objects.filter(owner_id=request.user.id).count()
+        if count == 1:
+            return response.Response({"error":"cant delete when you only have one"})
+        instance.delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
+    
 
 class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsOwner]
+    permission_classes = [PharmacyOwner]
 
     def get_queryset(self):
         return Employee.objects.select_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
@@ -89,4 +97,4 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         user_id = self.get_object().user_id
         User.objects.get(id=user_id).delete()
-        return response.Response(status=200)
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
