@@ -26,7 +26,10 @@ SECRET_KEY = 'django-insecure-w@-i=-9$472w#2(c=v)d56&m^s8@r3hd(b7=x8!8e$h7mtkx46
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1'
+]
 
 
 # Application definition
@@ -140,12 +143,14 @@ REST_FRAMEWORK = {
     ),
 }
 
-#DJOSER = {
+DJOSER = {
+    'SET_PASSWORD_RETYPE' : True,
+    'USER_CREATE_PASSWORD_RETYPE':True
 #    'SERIALIZERS': {
 #        'user_create': 'core.serializers.UserCreateSerializer',
 #        'current_user': 'core.serializers.UserSerializer',
 #    }
-#}
+}
 
 SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
