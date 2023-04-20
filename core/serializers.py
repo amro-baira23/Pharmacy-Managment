@@ -21,27 +21,32 @@ class MedicineSerializer(serializers.ModelSerializer):
             'price',
         ]
 
+
+class PurchaseListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Purchase
+        fields = [
+            'id',
+            'reciver_name',
+            'time_stamp'
+        ]
+    
+    
 class PurchaseSerializer(serializers.ModelSerializer):
     items = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = Purchase
         fields = [
             'id',
-            'pharmacy',
             'reciver_name',
+            'time_stamp',
             'items'
         ]
-        read_only_fields = ['pharmacy']
     
     def get_items(self,obj):
         items = PurchaseItem.objects.filter(purchase_id=obj.id)
         items = PurchaseItemSerializer(items,many=True).data
         return items
-
-    def save(self, **kwargs):
-        print('hi save!')
-        # print("kwargs:",kwargs['it'])
-        return super().save(**kwargs)
 
 class PurchaseItemSerializer(serializers.ModelSerializer):
     class Meta:

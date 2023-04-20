@@ -13,12 +13,17 @@ class MedicineViewset(viewsets.ModelViewSet):
     
    
 class PurchaseViewset(viewsets.ModelViewSet):
-    permission_classes = [isMember]
+    # permission_classes = [isMember]
     serializer_class = PurchaseSerializer
 
     def get_queryset(self):
         return Purchase.objects.filter( pharmacy_id=self.kwargs['pharmacy_pk'])
     
+    def get_serializer_class(self):
+        if self.action is 'list':
+            return PurchaseListSerializer
+        return PurchaseSerializer
+
     def perform_create(self, serializer):
         items = self.request.data.get('items')
         if not items:
