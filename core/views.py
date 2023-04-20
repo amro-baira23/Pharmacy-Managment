@@ -1,16 +1,17 @@
-from django.shortcuts import render
 from .models import *
 from .serializers import *
 from .permissions import *
-from rest_framework import views, generics,authentication,permissions
-# Create your views here.
-
+from rest_framework import generics,authentication,viewsets,response
 
 class MedicineListCreateAPIView(generics.ListCreateAPIView):
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
+<<<<<<< HEAD
     # authentication_classes = [authentication.SessionAuthentication]
     # permission_classes = [permissions.IsAuthenticated, isMember]
+=======
+    permission_classes = [isMember]
+>>>>>>> ef5ac64ea7975fd2b9461d1529dfb9da3fb35325
     
     def get_queryset(self):
         return Medicine.objects.filter(pharmacy=self.kwargs['pk'])
@@ -25,7 +26,11 @@ class MedicineListCreateAPIView(generics.ListCreateAPIView):
 
 class PurchaseListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = PurchaseSerializer
+<<<<<<< HEAD
     # permission_classes = [permissions.IsAuthenticated, isMember]
+=======
+    permission_classes = [isMember]
+>>>>>>> ef5ac64ea7975fd2b9461d1529dfb9da3fb35325
 
     def get_queryset(self):
         qs = Purchase.objects.filter(pharmacy=self.kwargs['pharmacy_id'])
@@ -45,6 +50,7 @@ class PurchaseListCreateAPIView(generics.ListCreateAPIView):
             item_serializer.save(purchase_id=purchase.id)
         serializer.save()
         return serializer
+<<<<<<< HEAD
     
 class PurchaseRetrieveDestroyUpdateAPIView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PurchaseSerializer
@@ -57,3 +63,43 @@ class PurchaseRetrieveDestroyUpdateAPIView(generics.RetrieveUpdateDestroyAPIView
         else:
             raise Exception("Such list doesn't exist")
     
+=======
+
+
+class PharmacyViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwner]
+
+    def get_queryset(self):
+        return Pharmacy.objects.filter(owner_id=self.request.user.id)
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return PharmacyListSerializer
+        return PharmacySerializer
+    
+    def get_serializer_context(self):
+        return {'owner_id':self.request.user.id}
+    
+
+class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwner]
+
+    def get_queryset(self):
+        return Employee.objects.select_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EmployeeListSerializer
+        if self.action == 'create':
+            return EmployeeCreateSerializer
+        return EmployeeSerializer
+    
+    def get_serializer_context(self):
+        return {'pharmacy_pk':self.kwargs['pharmacy_pk']}
+    
+
+    def destroy(self, request, *args, **kwargs):
+        user_id = self.get_object().user_id
+        User.objects.get(id=user_id).delete()
+        return response.Response(status=200)
+>>>>>>> ef5ac64ea7975fd2b9461d1529dfb9da3fb35325
