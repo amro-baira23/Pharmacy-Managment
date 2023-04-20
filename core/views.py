@@ -5,7 +5,7 @@ from rest_framework import generics,authentication,viewsets,response
 
 
 class MedicineViewset(viewsets.ModelViewSet):
-    permission_classes = [isMember]
+    # permission_classes = [isMember]
     serializer_class = MedicineSerializer
     
     def get_queryset(self):
