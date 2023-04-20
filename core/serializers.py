@@ -52,7 +52,6 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
             'price',
         ]
 
-<<<<<<< HEAD
  
     def create(self, validated_data):
         quantity = validated_data['quantity']
@@ -60,7 +59,6 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
         medicine.quantity -= quantity
         medicine.save()
         return super().create(validated_data)
-=======
 
 class PharmacyListSerializer(serializers.ModelSerializer):
 
@@ -143,4 +141,3 @@ class EmployeeCreateSerializer(UserCreateSerializer):
             return self.instance
 
 
->>>>>>> ef5ac64ea7975fd2b9461d1529dfb9da3fb35325

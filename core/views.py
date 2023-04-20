@@ -6,12 +6,7 @@ from rest_framework import generics,authentication,viewsets,response
 class MedicineListCreateAPIView(generics.ListCreateAPIView):
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
-<<<<<<< HEAD
-    # authentication_classes = [authentication.SessionAuthentication]
-    # permission_classes = [permissions.IsAuthenticated, isMember]
-=======
     permission_classes = [isMember]
->>>>>>> ef5ac64ea7975fd2b9461d1529dfb9da3fb35325
     
     def get_queryset(self):
         return Medicine.objects.filter(pharmacy=self.kwargs['pk'])
@@ -24,13 +19,21 @@ class MedicineListCreateAPIView(generics.ListCreateAPIView):
         return medicine
     
 
+class PurchaseRetrieveDestroyUpdateAPIView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = PurchaseSerializer
+    # permission_classes = [permissions.IsAuthenticated, isMember]
+
+    def get_queryset(self):
+        qs = Purchase.objects.filter(pharmacy=self.kwargs['pharmacy_id'])
+        if qs.exists():
+            return qs
+        else:
+            raise Exception("Such list doesn't exist")
+
+
 class PurchaseListCreateAPIView(generics.ListCreateAPIView):
     serializer_class = PurchaseSerializer
-<<<<<<< HEAD
-    # permission_classes = [permissions.IsAuthenticated, isMember]
-=======
     permission_classes = [isMember]
->>>>>>> ef5ac64ea7975fd2b9461d1529dfb9da3fb35325
 
     def get_queryset(self):
         qs = Purchase.objects.filter(pharmacy=self.kwargs['pharmacy_id'])
@@ -50,20 +53,8 @@ class PurchaseListCreateAPIView(generics.ListCreateAPIView):
             item_serializer.save(purchase_id=purchase.id)
         serializer.save()
         return serializer
-<<<<<<< HEAD
-    
-class PurchaseRetrieveDestroyUpdateAPIView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = PurchaseSerializer
-    # permission_classes = [permissions.IsAuthenticated, isMember]
 
-    def get_queryset(self):
-        qs = Purchase.objects.filter(pharmacy=self.kwargs['pharmacy_id'])
-        if qs.exists():
-            return qs
-        else:
-            raise Exception("Such list doesn't exist")
-    
-=======
+
 
 
 class PharmacyViewSet(viewsets.ModelViewSet):
@@ -102,4 +93,3 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
         user_id = self.get_object().user_id
         User.objects.get(id=user_id).delete()
         return response.Response(status=200)
->>>>>>> ef5ac64ea7975fd2b9461d1529dfb9da3fb35325
