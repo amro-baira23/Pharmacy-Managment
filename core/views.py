@@ -7,10 +7,13 @@ from rest_framework import generics,authentication,viewsets,response,status
 class MedicineViewset(viewsets.ModelViewSet):
     permission_classes = [isMember]
     serializer_class = MedicineSerializer
-    
+
     def get_queryset(self):
-        return Medicine.objects.filter( pharmacy_id=self.kwargs['pharmacy_pk'])
+        return Medicine.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=1)
     
+    def get_serializer_context(self):
+        return {'pharmacy_pk':self.kwargs['pharmacy_pk']}
+         
    
 class PurchaseViewset(viewsets.ModelViewSet):
     permission_classes = [isMember]

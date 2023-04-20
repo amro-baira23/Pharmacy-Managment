@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
 from django.conf import settings
+
 from .validators import validate_old_date
 
 User = settings.AUTH_USER_MODEL
@@ -12,6 +13,26 @@ ROLE_CHOICES = [
     (EMPLOYEE,'Employee'),
     (MANAGER,'Manager'),
     ]
+
+################## MANAGERS ######################
+
+class MedicineManager(models.Manager):
+    def get(self,ph_id,data):
+        return Medicine.objects.get(pharmacy_id=ph_id,
+                                    type=data.get('type'),
+                                    brand_name=data.get('brand_name'),
+                                    barcode=data.get('barcode')
+                                    )
+    
+    def get_comp(self,ph_id,com_id,data):
+        return Medicine.objects.get(pharmacy_id=ph_id,
+                                    company_id =com_id,
+                                    type=data.get('type'),
+                                    brand_name=data.get('brand_name'),
+                                    barcode=data.get('barcode')
+                                    )
+    
+################## MODLES ######################
 
 class Pharmacy(models.Model):
     owner = models.ForeignKey(User,on_delete=models.PROTECT,related_name='pharmacys')
@@ -27,6 +48,9 @@ class Pharmacy(models.Model):
 class Company(models.Model):
     name = models.CharField(max_length=50)
     pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
+
+    def __str__(self) -> str:
+        return self.name
 
     class Meta:
         unique_together = [['name', 'pharmacy']]
@@ -63,6 +87,7 @@ class Medicine(models.Model):
         (INHALERS, 'Inhalers'),
         (TOPICALS, 'Topicals')
     ]
+
     company = models.ForeignKey(Company,on_delete=models.PROTECT,related_name='medicines',null=True,blank=True)
     pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='medicines')
     brand_name = models.CharField(max_length=50)
@@ -74,12 +99,15 @@ class Medicine(models.Model):
     expiry_date = models.DateField(validators=[validate_old_date])
     type = models.CharField(max_length=2,choices=TYPE_CHOICES)
 
+    objects = models.Manager()
+    unique_medicine = MedicineManager()
+
     def __str__(self) -> str:
         return self.brand_name
     
     class Meta:
         ordering = ['brand_name']
-        unique_together = [['company', 'pharmacy', 'type', 'brand_name', 'barcode']]
+        unique_together = [['pharmacy', 'type', 'brand_name', 'barcode']]
     
 
 class Substance(models.Model):

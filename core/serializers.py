@@ -9,6 +9,8 @@ from .models import *
 User = get_user_model()
 
 class MedicineSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(max_length=50,write_only=True,required=False)
+    company = serializers.PrimaryKeyRelatedField(read_only=True)
     class Meta:
         model = Medicine
         fields = [
@@ -16,11 +18,50 @@ class MedicineSerializer(serializers.ModelSerializer):
             'brand_name',
             'company',
             'barcode',
+            'company_name',
             'type',
             'quantity',
             'price',
+            'expiry_date',
+            'need_prescription'
         ]
 
+    def create(self, validated_data):
+        return super().create(validated_data)
+
+    def create(self, validated_data):
+        name = validated_data.get('company_name')
+        ph_id = self.context['pharmacy_pk']
+        company = None
+
+        with transaction.atomic():
+            if name:
+                validated_data.pop('company_name')
+                try:
+                    company = Company.objects.get(pharmacy_id=ph_id,name=name)
+                except Company.DoesNotExist:
+                    company = Company.objects.create(pharmacy_id=ph_id,name=name)
+            if company is not None:
+                try:
+                    medicine = Medicine.unique_medicine.get_comp(ph_id,company.id,validated_data)
+                except Medicine.DoesNotExist:
+                    medicine = Medicine.objects.create(pharmacy_id=ph_id,**validated_data,company_id=company.id)
+            else:
+                try:
+                    medicine = Medicine.unique_medicine.get(ph_id,validated_data)
+                except Medicine.DoesNotExist:
+                    medicine = Medicine.objects.create(pharmacy_id=ph_id,**validated_data)
+
+            return medicine
+        
+    def update(self, instance, validated_data):
+        ph_id = self.context['pharmacy_pk']
+        try:
+            Medicine.unique_medicine.get(ph_id,validated_data)
+            raise serializers.ValidationError({'error':'medicine with this data already exist'})
+        except Medicine.DoesNotExist:
+            return super().update(instance, validated_data)    
+                        
 
 class PurchaseListSerializer(serializers.ModelSerializer):
     class Meta:
