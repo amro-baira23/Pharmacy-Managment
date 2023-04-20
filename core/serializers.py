@@ -21,27 +21,35 @@ class PurchaseSerializer(serializers.ModelSerializer):
         model = Purchase
         fields = [
             'id',
+            'pharmacy',
             'reciver_name',
             'items'
         ]
+        read_only_fields = ['pharmacy']
     
     def get_items(self,obj):
-        if hasattr(obj,'id'):
-            print(obj)
-            pk = obj.pk
-            items = PurchaseItem.objects.filter(purchase_id=pk)
-            arr = []
-            for item in items:
-                item = PurchaseItemSerializer(item).data
-                arr.append(item)
-            return arr
-        return None
+        items = PurchaseItem.objects.filter(purchase_id=obj.id)
+        items = PurchaseItemSerializer(items,many=True).data
+        return items
+
+    def save(self, **kwargs):
+        print('hi save!')
+        # print("kwargs:",kwargs['it'])
+        return super().save(**kwargs)
+
 class PurchaseItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseItem
         fields = [
             'medicine',
-            'purchase',
             'quantity',
             'price',
         ]
+
+ 
+    def create(self, validated_data):
+        quantity = validated_data['quantity']
+        medicine = validated_data['medicine']
+        medicine.quantity -= quantity
+        medicine.save()
+        return super().create(validated_data)
