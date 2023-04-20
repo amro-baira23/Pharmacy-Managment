@@ -21,6 +21,17 @@ class MedicineSerializer(serializers.ModelSerializer):
             'price',
         ]
 
+
+class PurchaseListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Purchase
+        fields = [
+            'id',
+            'reciver_name',
+            'time_stamp'
+        ]
+    
+    
 class PurchaseSerializer(serializers.ModelSerializer):
     items = serializers.SerializerMethodField(read_only=True)
     class Meta:
@@ -28,30 +39,37 @@ class PurchaseSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'reciver_name',
+            'time_stamp',
             'items'
         ]
     
     def get_items(self,obj):
-        if hasattr(obj,'id'):
-            print(obj)
-            pk = obj.pk
-            items = PurchaseItem.objects.filter(purchase_id=pk)
-            arr = []
-            for item in items:
-                item = PurchaseItemSerializer(item).data
-                arr.append(item)
-            return arr
-        return None
+        items = PurchaseItem.objects.filter(purchase_id=obj.id)
+        items = PurchaseItemSerializer(items,many=True).data
+        return items
+
 class PurchaseItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseItem
         fields = [
             'medicine',
-            'purchase',
             'quantity',
             'price',
         ]
-
+        
+    def validate(self, attrs):
+        medicine = attrs['medicine']
+        purchase = self.context.get('purchase')
+        if not medicine.pharmacy.id is purchase.pharmacy.id:
+            raise serializers.ValidationError({'message':'unauthorized operation'})
+        return super().validate(attrs)
+    
+    def create(self, validated_data):
+        medicine = validated_data['medicine']
+        quantity = validated_data['quantity']
+        medicine.quantity += quantity
+        medicine.save()
+        return super().create(validated_data)
 
 class PharmacyListSerializer(serializers.ModelSerializer):
 
