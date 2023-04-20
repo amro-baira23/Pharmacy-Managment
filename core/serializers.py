@@ -31,7 +31,45 @@ class PurchaseListSerializer(serializers.ModelSerializer):
             'time_stamp'
         ]
     
+class SaleSerializer(serializers.ModelSerializer):
+    items = serializers.SerializerMethodField(read_only=True)
+    class Meta:
+        model = Sale
+        fields = [
+            'id',
+            'seller_name',
+            'time_stamp',
+            'items'
+        ]
     
+    def get_items(self,obj):
+        items = SaleItem.objects.filter(sale_id=obj.id)
+        items = SaleItemSerializer(items,many=True).data
+        return items
+    
+class SaleItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SaleItem
+        fields = [
+            'medicine',
+            'quantity',
+            'price',
+        ]
+
+    def validate(self, attrs):
+        medicine = attrs['medicine']
+        sale = self.context.get('sale')
+        if not medicine.pharmacy.id is sale.pharmacy.id:
+            raise serializers.ValidationError({'message':'unauthorized operation'})
+        return super().validate(attrs)
+    
+    def create(self, validated_data):
+        medicine = validated_data['medicine']
+        quantity = validated_data['quantity']
+        medicine.quantity -= quantity
+        medicine.save()
+        return super().create(validated_data)
+
 class PurchaseSerializer(serializers.ModelSerializer):
     items = serializers.SerializerMethodField(read_only=True)
     class Meta:
@@ -56,7 +94,7 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
             'quantity',
             'price',
         ]
-        
+
     def validate(self, attrs):
         medicine = attrs['medicine']
         purchase = self.context.get('purchase')

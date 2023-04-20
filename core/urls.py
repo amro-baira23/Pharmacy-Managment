@@ -14,8 +14,11 @@ medicine_router = routers.NestedDefaultRouter(router,'pharmacy',lookup='pharmacy
 medicine_router.register('medicine',MedicineViewset,basename='pharmacy-medicine')
 
 purchase_router = routers.NestedDefaultRouter(router,'pharmacy',lookup='pharmacy')
-purchase_router.register('purchase',PurchaseViewset,basename='pharmacy-medicine')
+purchase_router.register('purchase',PurchaseViewset,basename='pharmacy-purchase')
 
-urls = router.urls + employee_router.urls + medicine_router.urls + purchase_router.urls
+sale_router = routers.NestedDefaultRouter(router,'pharmacy',lookup='pharmacy')
+sale_router.register('sale',SaleViewset,basename='pharmacy-sale')
+
+urls = router.urls + employee_router.urls + medicine_router.urls + purchase_router.urls + sale_router.urls
 
 urlpatterns = urls
