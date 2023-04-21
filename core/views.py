@@ -1,16 +1,21 @@
 from .models import *
 from .serializers import *
 from .permissions import *
-from rest_framework import generics,authentication,viewsets,response,status
+from rest_framework import viewsets,response,status
 
 
 class MedicineViewset(viewsets.ModelViewSet):
     permission_classes = [isMember]
-    serializer_class = MedicineSerializer
 
     def get_queryset(self):
-        return Medicine.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=1)
+        return Medicine.objects.select_related('company').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=1)
     
+    def get_serializer_class(self):
+        print(self.action)
+        if self.action == 'update' or self.action == 'partial_update':
+            return MedicineUpdateSerializer
+        return MedicineSerializer
+
     def get_serializer_context(self):
         return {'pharmacy_pk':self.kwargs['pharmacy_pk']}
          
@@ -23,7 +28,7 @@ class PurchaseViewset(viewsets.ModelViewSet):
         return Purchase.objects.filter( pharmacy_id=self.kwargs['pharmacy_pk'])
     
     def get_serializer_class(self):
-        if self.action is 'list':
+        if self.action == 'list':
             return PurchaseListSerializer
         return PurchaseSerializer
 

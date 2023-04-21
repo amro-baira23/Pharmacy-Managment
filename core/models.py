@@ -17,20 +17,27 @@ ROLE_CHOICES = [
 ################## MANAGERS ######################
 
 class MedicineManager(models.Manager):
-    def get(self,ph_id,data):
+    def get(self,ph_id,company,data):
         return Medicine.objects.get(pharmacy_id=ph_id,
+                                    company=company,
                                     type=data.get('type'),
                                     brand_name=data.get('brand_name'),
-                                    barcode=data.get('barcode')
-                                    )
+                                    barcode=data.get('barcode'))
     
-    def get_comp(self,ph_id,com_id,data):
-        return Medicine.objects.get(pharmacy_id=ph_id,
-                                    company_id =com_id,
-                                    type=data.get('type'),
-                                    brand_name=data.get('brand_name'),
-                                    barcode=data.get('barcode')
-                                    )
+    
+    def get_or_create(self,ph_id,company,data):
+        medicine , created = Medicine.objects.get_or_create(
+                                    pharmacy_id=ph_id,
+                                    company =company,
+                                    type=data.pop('type'),
+                                    brand_name=data.pop('brand_name'),
+                                    barcode=data.pop('barcode'),
+                                    defaults= {
+                                        'quantity':data.get('quantity'),
+                                        'price':data.get('price'),
+                                        'need_prescription':data.get('need_prescription'),
+                                        'expiry_date':data.get('expiry_date')})
+        return medicine,created
     
 ################## MODLES ######################
 
@@ -107,7 +114,7 @@ class Medicine(models.Model):
     
     class Meta:
         ordering = ['brand_name']
-        unique_together = [['pharmacy', 'type', 'brand_name', 'barcode']]
+        unique_together = [['pharmacy', 'company' ,'type', 'brand_name', 'barcode']]
     
 
 class Substance(models.Model):
