@@ -150,7 +150,7 @@ class Sale(models.Model):
 
 class SaleItem(models.Model):
     medicine = models.ForeignKey(Medicine,on_delete=models.PROTECT,related_name='bill_items')
-    sale = models.ForeignKey(Sale,on_delete=models.PROTECT,related_name='items')
+    sale = models.ForeignKey(Sale,on_delete=models.CASCADE,related_name='items')
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
     

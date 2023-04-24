@@ -5,7 +5,7 @@ from rest_framework import viewsets,response,status
 
 
 class MedicineViewset(viewsets.ModelViewSet):
-    permission_classes = [isMember]
+    permission_classes = [IsMember]
 
     def get_queryset(self):
         return Medicine.objects.select_related('company').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=1)
@@ -21,7 +21,7 @@ class MedicineViewset(viewsets.ModelViewSet):
          
    
 class PurchaseViewset(viewsets.ModelViewSet):
-    permission_classes = [isMember]
+    permission_classes = [PharmacyOwnerOrManager]
     serializer_class = PurchaseSerializer
 
     def get_queryset(self):
@@ -45,21 +45,36 @@ class PurchaseViewset(viewsets.ModelViewSet):
 
 
 class SaleViewset(viewsets.ModelViewSet):
-    permission_classes = [isMember]
-    serializer_class = SaleSerializer
 
     def get_queryset(self):
-            return Sale.objects.filter( pharmacy_id=self.kwargs['pharmacy_pk'])
+            if self.action == 'list':
+                 return Sale.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+            return Sale.objects.prefetch_related('items').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return SaleListSerializer
+        return SaleSerializer
+    
+    def get_serializer_context(self):
+        user = self.request.user
+        name = user.first_name + ' ' + user.last_name
+        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'name':name}
+    
+    def get_permissions(self):
+        if self.action == 'delete':
+            return [PharmacyOwner()]
+        return [IsMember()]
         
-    def perform_create(self, serializer):
-        items = self.request.data.get('items')
-        if not items:
-            raise Exception("sale order can't be empty")
-        sale = serializer.save(pharmacy_id = self.kwargs['pharmacy_pk'])
-        item_serializer = SaleItemSerializer(data=items,many=True,context={'sale':sale})
-        if  item_serializer.is_valid(raise_exception=True):
-            item_serializer.save(sale_id=sale.id)
-        serializer.save()
+    #def perform_create(self, serializer):
+    #    items = self.request.data.get('items')
+    #    if not items:
+    #        raise Exception("sale order can't be empty")
+    #    sale = serializer.save(pharmacy_id = self.kwargs['pharmacy_pk'])
+    #    item_serializer = SaleItemSerializer(data=items,many=True,context={'sale':sale})
+    #    if  item_serializer.is_valid(raise_exception=True):
+    #        item_serializer.save(sale_id=sale.id)
+    #    serializer.save()
 
 
 class PharmacyViewSet(viewsets.ModelViewSet):

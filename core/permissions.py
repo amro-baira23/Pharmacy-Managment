@@ -26,7 +26,7 @@ class PharmacyOwnerOrManager(permissions.BasePermission):
                                         id=id).exists()
         
 
-class isMember(permissions.BasePermission):
+class IsMember(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.user and request.user.is_authenticated:
             id = view.kwargs.get("pharmacy_pk")

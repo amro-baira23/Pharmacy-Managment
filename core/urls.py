@@ -16,6 +16,9 @@ purchase_router.register('purchase',PurchaseViewset,basename='pharmacy-purchase'
 sale_router = routers.NestedDefaultRouter(router,'pharmacy',lookup='pharmacy')
 sale_router.register('sale',SaleViewset,basename='pharmacy-sale')
 
-urls = router.urls + employee_router.urls + medicine_router.urls + purchase_router.urls + sale_router.urls
+#sale_item_router = routers.NestedDefaultRouter(sale_router,'sale',lookup='sale')
+#sale_item_router.register('items',SaleViewset,basename='pharmacy-sale-items')
+
+urls = router.urls + employee_router.urls + medicine_router.urls + purchase_router.urls + sale_router.urls #+ sale_item_router.urls
 
 urlpatterns = urls
