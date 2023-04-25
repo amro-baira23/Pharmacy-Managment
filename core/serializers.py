@@ -99,6 +99,7 @@ class PurchaseListSerializer(serializers.ModelSerializer):
     
     
 class SaleItemSerializer(serializers.ModelSerializer):
+    price = serializers.IntegerField(read_only=True)
     class Meta:
         model = SaleItem
         fields = [
@@ -108,18 +109,23 @@ class SaleItemSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        medicine = attrs['medicine']
-        sale = self.context.get('sale')
-        if not medicine.pharmacy.id is sale.pharmacy.id:
-            raise serializers.ValidationError({'message':'unauthorized operation'})
+        medicine = attrs.get('medicine')
+        if medicine.pharmacy == None:
+            raise serializers.ValidationError({'error':"no such medicne found"})
+        if medicine.pharmacy.id != self.context['sale'].pharmacy.id:
+            raise serializers.ValidationError({'error':'no medicine with such id for this pharmacy'})
         return super().validate(attrs)
+
     
     def create(self, validated_data):
         medicine = validated_data['medicine']
         quantity = validated_data['quantity']
-        medicine.quantity -= quantity
-        medicine.save()
-        return super().create(validated_data)
+        with transaction.atomic():
+            medicine.quantity -= quantity
+            if medicine.quantity <= 0:
+                raise serializers.ValidationError({'error':'not enough medicine in enventory'})
+            medicine.save()
+            return SaleItem.objects.create(sale=self.context['sale'],price=medicine.price,**validated_data)
 
 
 class SaleListSerializer(serializers.ModelSerializer):
@@ -137,77 +143,53 @@ class SaleListSerializer(serializers.ModelSerializer):
 
     def format_time(self,sale):
         return sale.time_stamp.strftime(f"%Y-%m-%d %H:%m")
-    
 
-class SaleSerializer(serializers.ModelSerializer):
-    items = SaleItemSerializer(many=True,read_only=True)
-    time = serializers.SerializerMethodField(read_only=True,method_name='format_time')
-    seller_name = serializers.CharField(read_only=True)
-    ids_list = serializers.ListField(child=serializers.IntegerField(min_value=0),write_only=True)
-    amount_list = serializers.ListField(child=serializers.IntegerField(min_value=0),write_only=True)
-
+class SaleSerizlizer(serializers.ModelSerializer):
+    items = SaleItemSerializer(many=True)
     class Meta:
         model = Sale
-        fields = [
-            'id',
-            'seller_name',
-            'time',
-            'items',
-            'ids_list',
-            'amount_list'
-        ]
+        fields = '__all__'
 
-    def format_time(self,sale):
-        return sale.time_stamp.strftime(f"%Y-%m-%d %H:%m")
-    
-    def validate(self, attrs):
-        ids_length = len(attrs.get('ids_list'))
-        amount_length = len(attrs.get('amount_list'))
 
-        if ids_length != amount_length:
-            raise serializers.ValidationError({'error':'ids_list and amount_list length must be equal'})
-        
-        if ids_length == 0:
-            raise serializers.ValidationError({'error':'ids_list and amount_list length must gretter than 0'})
+class SaleCreateSerializer(serializers.ModelSerializer):
+    items = serializers.ListField(child=serializers.DictField(),write_only=True)
+    class Meta:
+        model = Sale
+        fields = ['items']
 
-        return super().validate(attrs)
-    
+
+    def validate_items(self,items):
+        if len(items) == 0:
+            raise serializers.ValidationError({'items':'sale should have atleast one item'})
+        return items
+
     def save(self, **kwargs):
-        ids_list = self.validated_data.pop('ids_list')
-        amount_list = self.validated_data.pop('amount_list')
-        ids_set_length = len(set(ids_list))
+        items = self.validated_data.pop('items')
 
-        meds = Medicine.objects.filter(id__in=ids_list,pharmacy_id=self.context['pharmacy_pk'])
+        ids = []
 
-        if meds.count() != ids_set_length:
-            raise serializers.ValidationError({'error':'some ids are invalid'})
-        
-        if ids_set_length != len(ids_list):
-            for idx,i in enumerate(ids_list):
-                if i != -1:
-                    for idx2,j in enumerate(ids_list):
-                        if idx != idx2 and i == j and i != -1:
-                            amount_list[idx] += amount_list[idx2]
-                            ids_list[idx2] = -1
-                            amount_list[idx2] = -1
+        for item in items:
+            ids.append(item['medicine'])
+            if 'medicine' and 'quantity' in item:
+                    for idx2,item2 in enumerate(items):
+                        if item['medicine'] == item2['medicine'] and item is not item2:
+                            item['quantity'] += item2['quantity']
+                            items.pop(idx2)
+
+            else:
+                raise serializers.ValidationError({"error":"dic must have medicine and quantity"})
+
+        meds = Medicine.objects.filter(id__in=ids,pharmacy_id=self.context['pharmacy_pk'])
+
+        if meds.count() != len(set(ids)):
+            raise serializers.ValidationError({"error":"some of the ids are invalid"})
 
         with transaction.atomic():
-            sale = Sale.objects.create(seller_name=self.context['name'],pharmacy_id=self.context['pharmacy_pk'])
+            sale = Sale.objects.create(pharmacy_id=self.context['pharmacy_pk'],seller_name=self.context['name'])
+            items = SaleItemSerializer(data=items,many=True,context={'sale':sale})
+            items.is_valid(raise_exception=True)
+            items.save()
 
-            items = []
-
-            for med in meds:
-                idx = ids_list.index(med.id)
-                qua = amount_list[idx]
-                items.append(SaleItem(medicine=med,price=med.price,quantity=qua,sale=sale))
-            
-                med.quantity -= qua
-                if med.quantity < 0:
-                    raise serializers.ValidationError({'error':'not enough medicine to add to sale'})
-
-            SaleItem.objects.bulk_create(items)
-            Medicine.objects.bulk_update(meds,['quantity'])
-        
         self.instance = sale
         return self.instance
 

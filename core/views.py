@@ -11,7 +11,6 @@ class MedicineViewset(viewsets.ModelViewSet):
         return Medicine.objects.select_related('company').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=1)
     
     def get_serializer_class(self):
-        print(self.action)
         if self.action == 'update' or self.action == 'partial_update':
             return MedicineUpdateSerializer
         return MedicineSerializer
@@ -52,9 +51,13 @@ class SaleViewset(viewsets.ModelViewSet):
             return Sale.objects.prefetch_related('items').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
     
     def get_serializer_class(self):
+        print(self.action)
         if self.action == 'list':
             return SaleListSerializer
-        return SaleSerializer
+        elif self.action == 'retrieve':
+            print('retive')
+            return SaleSerizlizer
+        return SaleCreateSerializer
     
     def get_serializer_context(self):
         user = self.request.user
@@ -72,8 +75,8 @@ class SaleViewset(viewsets.ModelViewSet):
     #        raise Exception("sale order can't be empty")
     #    sale = serializer.save(pharmacy_id = self.kwargs['pharmacy_pk'])
     #    item_serializer = SaleItemSerializer(data=items,many=True,context={'sale':sale})
-    #    if  item_serializer.is_valid(raise_exception=True):
-    #        item_serializer.save(sale_id=sale.id)
+    #    item_serializer.is_valid(raise_exception=True)
+    #    item_serializer.save()
     #    serializer.save()
 
 
