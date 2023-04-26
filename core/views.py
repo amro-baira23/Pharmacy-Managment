@@ -51,11 +51,9 @@ class SaleViewset(viewsets.ModelViewSet):
             return Sale.objects.prefetch_related('items').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
     
     def get_serializer_class(self):
-        print(self.action)
         if self.action == 'list':
             return SaleListSerializer
         elif self.action == 'retrieve':
-            print('retive')
             return SaleSerizlizer
         return SaleCreateSerializer
     
@@ -68,16 +66,23 @@ class SaleViewset(viewsets.ModelViewSet):
         if self.action == 'delete':
             return [PharmacyOwner()]
         return [IsMember()]
-        
-    #def perform_create(self, serializer):
-    #    items = self.request.data.get('items')
-    #    if not items:
-    #        raise Exception("sale order can't be empty")
-    #    sale = serializer.save(pharmacy_id = self.kwargs['pharmacy_pk'])
-    #    item_serializer = SaleItemSerializer(data=items,many=True,context={'sale':sale})
-    #    item_serializer.is_valid(raise_exception=True)
-    #    item_serializer.save()
-    #    serializer.save()
+
+
+    def perform_create(self, serializer):
+        items = self.request.data.get('items')
+
+        for item in items:
+            for idx2,item2 in enumerate(items):
+                if item['medicine'] == item2['medicine'] and item is not item2:
+                    item['quantity'] += item2['quantity']
+                    items.pop(idx2)
+
+        with transaction.atomic():
+            sale = serializer.save()
+            new_context = {'sale':sale,'pharmacy_pk':self.kwargs['pharmacy_pk']}
+            item_serializer = SaleItemSerializer(data=items,many=True,context=new_context)
+            item_serializer.is_valid(raise_exception=True)
+            item_serializer.save()
 
 
 class PharmacyViewSet(viewsets.ModelViewSet):

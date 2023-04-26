@@ -110,9 +110,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         medicine = attrs.get('medicine')
-        if medicine.pharmacy == None:
-            raise serializers.ValidationError({'error':"no such medicne found"})
-        if medicine.pharmacy.id != self.context['sale'].pharmacy.id:
+        if medicine.pharmacy.id != int(self.context['pharmacy_pk']):
             raise serializers.ValidationError({'error':'no medicine with such id for this pharmacy'})
         return super().validate(attrs)
 
@@ -144,15 +142,20 @@ class SaleListSerializer(serializers.ModelSerializer):
     def format_time(self,sale):
         return sale.time_stamp.strftime(f"%Y-%m-%d %H:%m")
 
+
 class SaleSerizlizer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True)
+    time = serializers.SerializerMethodField(read_only=True,method_name='format_time')
     class Meta:
         model = Sale
-        fields = '__all__'
+        fields = ['id','seller_name','items','time']
+
+    def format_time(self,sale):
+        return sale.time_stamp.strftime(f"%Y-%m-%d %H:%m")
 
 
 class SaleCreateSerializer(serializers.ModelSerializer):
-    items = serializers.ListField(child=serializers.DictField(),write_only=True)
+    items = SaleItemSerializer(many=True)
     class Meta:
         model = Sale
         fields = ['items']
@@ -162,35 +165,9 @@ class SaleCreateSerializer(serializers.ModelSerializer):
         if len(items) == 0:
             raise serializers.ValidationError({'items':'sale should have atleast one item'})
         return items
-
+    
     def save(self, **kwargs):
-        items = self.validated_data.pop('items')
-
-        ids = []
-
-        for item in items:
-            ids.append(item['medicine'])
-            if 'medicine' and 'quantity' in item:
-                    for idx2,item2 in enumerate(items):
-                        if item['medicine'] == item2['medicine'] and item is not item2:
-                            item['quantity'] += item2['quantity']
-                            items.pop(idx2)
-
-            else:
-                raise serializers.ValidationError({"error":"dic must have medicine and quantity"})
-
-        meds = Medicine.objects.filter(id__in=ids,pharmacy_id=self.context['pharmacy_pk'])
-
-        if meds.count() != len(set(ids)):
-            raise serializers.ValidationError({"error":"some of the ids are invalid"})
-
-        with transaction.atomic():
-            sale = Sale.objects.create(pharmacy_id=self.context['pharmacy_pk'],seller_name=self.context['name'])
-            items = SaleItemSerializer(data=items,many=True,context={'sale':sale})
-            items.is_valid(raise_exception=True)
-            items.save()
-
-        self.instance = sale
+        self.instance = Sale.objects.create(pharmacy_id=self.context['pharmacy_pk'],seller_name=self.context['name'])
         return self.instance
 
 

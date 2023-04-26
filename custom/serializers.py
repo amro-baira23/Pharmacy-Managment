@@ -7,14 +7,19 @@ class MyTokenObtain(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         tokens = super().validate(attrs)
-
-        type = 'O' if Pharmacy.objects.filter(owner__id=self.user.id).exists() else None
+        if self.user.is_owner:
+            ph = Pharmacy.objects.filter(owner_id=self.user.id).first()
+            type = 'O'
+            pharmacy_id = ph.id
+        else :
+            type = None
 
         if not type:     
             try:
-                type = Employee.objects.get(user_id=self.user.id).role
-                print(type)
+                em = Employee.objects.get(user_id=self.user.id)
+                pharmacy_id = em.pharmacy.id
+                type = em.role
             except Employee.DoesNotExist:
                 raise serializers.ValidationError('undifained user type')
 
-        return {'type':type,'tokens':tokens}
+        return {'type':type,'pharmacy_id':pharmacy_id,'tokens':tokens}
