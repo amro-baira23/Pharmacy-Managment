@@ -8,9 +8,9 @@ class MyTokenObtain(TokenObtainPairSerializer):
     def validate(self, attrs):
         tokens = super().validate(attrs)
         if self.user.is_owner:
-            ph = Pharmacy.objects.filter(owner_id=self.user.id).first()
+            ph = Pharmacy.objects.filter(owner_id=self.user.id)
             type = 'O'
-            pharmacy_id = ph.id
+            pharmacy_id = ph.id if ph.exists() else None
         else :
             type = None
 
