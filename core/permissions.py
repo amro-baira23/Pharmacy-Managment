@@ -7,7 +7,7 @@ from core.models import Pharmacy
 class IsOwner(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.user and request.user.is_authenticated:
-            return Pharmacy.objects.filter(owner_id=request.user.id).exists()
+            return request.user.is_owner
         
         
 class PharmacyOwner(permissions.BasePermission):

@@ -13,7 +13,9 @@ class MedicineViewset(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'update' or self.action == 'partial_update':
             return MedicineUpdateSerializer
-        return MedicineSerializer
+        if self.action == 'create':
+            return MedicineCreateSerializer
+        return MedicineListSerializer
 
     def get_serializer_context(self):
         return {'pharmacy_pk':self.kwargs['pharmacy_pk']}
@@ -24,23 +26,36 @@ class PurchaseViewset(viewsets.ModelViewSet):
     serializer_class = PurchaseSerializer
 
     def get_queryset(self):
-        return Purchase.objects.filter( pharmacy_id=self.kwargs['pharmacy_pk'])
+        return Purchase.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
     
     def get_serializer_class(self):
         if self.action == 'list':
             return PurchaseListSerializer
+        elif self.action == 'create':
+            return PurchaseCreateSerializer
         return PurchaseSerializer
+    
+    def get_serializer_context(self):
+        user = self.request.user
+        name = user.first_name + ' ' + user.last_name
+        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'name':name}
 
     def perform_create(self, serializer):
         items = self.request.data.get('items')
-        if not items:
-            raise Exception("purchase order can't be empty")
-        purchase = serializer.save(pharmacy_id = self.kwargs['pharmacy_pk'])
-        item_serializer = PurchaseItemSerializer(data=items,many=True,context={'purchase':purchase})
-        if  item_serializer.is_valid(raise_exception=True):
-            
-            item_serializer.save(purchase_id=purchase.id)
-        serializer.save()
+
+        for item in items:
+            for idx2,item2 in enumerate(items):
+                if item['medicine'] == item2['medicine'] and item is not item2:
+                    item['quantity'] += item2['quantity']
+                    items.pop(idx2)
+
+
+        with transaction.atomic():
+            purchase = serializer.save()
+            new_context = {'purchase':purchase,'pharmacy_pk':self.kwargs['pharmacy_pk']}
+            item_serializer = PurchaseItemSerializer(data=items,many=True,context=new_context)
+            item_serializer.is_valid(raise_exception=True)
+            item_serializer.save()
 
 
 class SaleViewset(viewsets.ModelViewSet):

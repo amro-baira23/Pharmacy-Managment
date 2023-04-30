@@ -9,51 +9,98 @@ from .models import *
 
 User = get_user_model()
 
-class MedicineSerializer(serializers.ModelSerializer):
+# ########## COMPANY ##########
+
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ['id','name']
+
+# ########## MEDICINE ##########
+
+class MedicineListSerializer(serializers.ModelSerializer):
+    company = serializers.StringRelatedField()
+    class Meta:
+        model = Medicine
+        fields = [
+            'id',
+            'quantity',
+            'price',
+            'need_prescription',
+            'is_expired',
+            'brand_name',
+            'barcode',
+            'company',
+            'type'
+        ]
+  
+
+class MedicineCreateSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(max_length=50,write_only=True,required=False,allow_blank=True)
-    company = serializers.StringRelatedField(read_only=True)
+    substances = serializers.ListField(child=serializers.CharField(),max_length=50,required=False)
     class Meta:
         model = Medicine
         fields = [
             'id',
             'company_name',
-            'company',
             'brand_name',
             'barcode',
             'quantity',
             'price',
             'need_prescription',
-            'is_active',
             'expiry_date',
-            'type'
+            'type',
+            'substances'
         ]
+
+    def validate_substances(self,sub):
+        if len(set(sub)) != len(sub):
+            raise serializers.ValidationError("cant have dublicate in this array")
+        return sub 
+    
+    def validate_brand_name(self,name):
+        return name.capitalize()
   
     def create(self, validated_data):
         name = validated_data.get('company_name')
+        substances = validated_data.get('substances')
         ph_id = self.context['pharmacy_pk']
         company = None
 
         with transaction.atomic():
             if name:
+                name = name.capitalize()
                 validated_data.pop('company_name')
                 company, created = Company.objects.get_or_create(pharmacy_id=ph_id,name=name)
-
             
             medicine , created = Medicine.unique_medicine.get_or_create(ph_id,company,validated_data)
 
             if not created:
                 raise serializers.ValidationError({'error':'medicine with this data already exist'})
             
+            if substances:
+                validated_data.pop("substances")
+                valid_subs = list(Substance.objects.filter(pharmacy_id=ph_id,name__in=substances))
+            
+                for sub in valid_subs:
+                     if sub.name in substances:
+                         substances.remove(sub.name)
+            
+                created_substances = [Substance.objects.create(name=name,pharmacy_id=ph_id) for name in substances]
+
+                all_sub = created_substances + valid_subs
+
+                final_subs = [MedicineSubstance(medicine=medicine,substance=sub) for sub in all_sub]
+                MedicineSubstance.objects.bulk_create(final_subs)
+
             return medicine
         
 
 class MedicineUpdateSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(max_length=50,write_only=True,required=False,allow_blank=True)
-    company = serializers.StringRelatedField(read_only=True)
     class Meta:
         model = Medicine
         fields = [
-            'company',
             'brand_name',
             'barcode',
             'company_name',
@@ -65,17 +112,29 @@ class MedicineUpdateSerializer(serializers.ModelSerializer):
             'is_active'
         ]
 
+    def validate_brand_name(self,name):
+        return name.capitalize()
+    
+    def validate_company_name(self,company_name):
+        return company_name.capitalize()
+
     def update(self, instance, validated_data):
 
         ph_id = self.context['pharmacy_pk']
         com_name = validated_data.get('company_name')
         company = instance.company if instance.company is not None and self.partial else None
+        
+
+        validated_data['barcode'] = validated_data.get('barcode') or instance.barcode
+        validated_data['brand_name'] = validated_data.get('brand_name') or instance.brand_name
+        validated_data['type'] = validated_data.get('type') or instance.type
+
 
         with transaction.atomic():
 
             if com_name is not None and com_name != '':
                 company, created = Company.objects.get_or_create(pharmacy_id=ph_id,name=com_name)
-            
+
             try:
                 medicine = Medicine.unique_medicine.get(ph_id,company,validated_data)
                 if medicine != instance:
@@ -86,23 +145,14 @@ class MedicineUpdateSerializer(serializers.ModelSerializer):
             instance.company = company
             instance = super().update(instance, validated_data)
             return instance
-    
 
-class PurchaseListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Purchase
-        fields = [
-            'id',
-            'reciver_name',
-            'time_stamp'
-        ]
-    
+# ########## SALEITEM ##########
     
 class SaleItemSerializer(serializers.ModelSerializer):
-    price = serializers.IntegerField(read_only=True)
     class Meta:
         model = SaleItem
         fields = [
+            'id',
             'medicine',
             'quantity',
             'price',
@@ -111,7 +161,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         medicine = attrs.get('medicine')
         if medicine.pharmacy.id != int(self.context['pharmacy_pk']):
-            raise serializers.ValidationError({'error':'no medicine with such id for this pharmacy'})
+            raise serializers.ValidationError('no medicine with such id for this pharmacy')
         return super().validate(attrs)
 
     
@@ -120,16 +170,15 @@ class SaleItemSerializer(serializers.ModelSerializer):
         quantity = validated_data['quantity']
         with transaction.atomic():
             medicine.quantity -= quantity
-            if medicine.quantity <= 0:
-                raise serializers.ValidationError({'error':'not enough medicine in enventory'})
+            if medicine.quantity < 0:
+                raise serializers.ValidationError({'error':f'not enough medicine {medicine.brand_name} in enventory'})
             medicine.save()
-            return SaleItem.objects.create(sale=self.context['sale'],price=medicine.price,**validated_data)
+            return SaleItem.objects.create(sale=self.context['sale'],**validated_data)
 
+# ########## SALE ##########
 
 class SaleListSerializer(serializers.ModelSerializer):
-    time = serializers.SerializerMethodField(read_only=True,method_name='format_time')
     seller_name = serializers.CharField(read_only=True)
-
     class Meta:
         model = Sale
         fields = [
@@ -139,19 +188,11 @@ class SaleListSerializer(serializers.ModelSerializer):
         ]
 
 
-    def format_time(self,sale):
-        return sale.time_stamp.strftime(f"%Y-%m-%d %H:%m")
-
-
 class SaleSerizlizer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True)
-    time = serializers.SerializerMethodField(read_only=True,method_name='format_time')
     class Meta:
         model = Sale
         fields = ['id','seller_name','items','time']
-
-    def format_time(self,sale):
-        return sale.time_stamp.strftime(f"%Y-%m-%d %H:%m")
 
 
 class SaleCreateSerializer(serializers.ModelSerializer):
@@ -163,54 +204,74 @@ class SaleCreateSerializer(serializers.ModelSerializer):
 
     def validate_items(self,items):
         if len(items) == 0:
-            raise serializers.ValidationError({'items':'sale should have atleast one item'})
+            raise serializers.ValidationError('sale should have atleast one item')
         return items
     
     def save(self, **kwargs):
         self.instance = Sale.objects.create(pharmacy_id=self.context['pharmacy_pk'],seller_name=self.context['name'])
         return self.instance
 
-
-class PurchaseSerializer(serializers.ModelSerializer):
-    items = serializers.SerializerMethodField(read_only=True)
-    class Meta:
-        model = Purchase
-        fields = [
-            'id',
-            'reciver_name',
-            'time_stamp',
-            'items'
-        ]
-    
-    def get_items(self,obj):
-        items = PurchaseItem.objects.filter(purchase_id=obj.id)
-        items = PurchaseItemSerializer(items,many=True).data
-        return items
-
+# ########## PURCHASEITEM ##########
 
 class PurchaseItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseItem
-        fields = [
-            'medicine',
-            'quantity',
-            'price',
-        ]
+        fields = ['id','medicine','quantity','price']
 
     def validate(self, attrs):
-        medicine = attrs['medicine']
-        purchase = self.context.get('purchase')
-        if not medicine.pharmacy.id is purchase.pharmacy.id:
-            raise serializers.ValidationError({'message':'unauthorized operation'})
+        medicine = attrs.get('medicine')
+        if medicine.pharmacy.id != int(self.context['pharmacy_pk']):
+            raise serializers.ValidationError('no medicine with such id for this pharmacy')
         return super().validate(attrs)
     
     def create(self, validated_data):
         medicine = validated_data['medicine']
         quantity = validated_data['quantity']
-        medicine.quantity += quantity
-        medicine.save()
-        return super().create(validated_data)
+        with transaction.atomic():
+            medicine.quantity += quantity
+            medicine.save()
+            return PurchaseItem.objects.create(purchase=self.context['purchase'],**validated_data)
+
+# ########## PURCHASE ##########
+
+class PurchaseListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Purchase
+        fields = [
+            'id',
+            'reciver_name',
+            'time'
+        ]
     
+
+class PurchaseSerializer(serializers.ModelSerializer):
+    items = PurchaseItemSerializer(many=True)
+    class Meta:
+        model = Purchase
+        fields = [
+            'id',
+            'reciver_name',
+            'time',
+            'items'
+        ]
+    
+
+class PurchaseCreateSerializer(serializers.ModelSerializer):
+    items = PurchaseItemSerializer(many=True)
+    class Meta:
+        model = Purchase
+        fields = ['items']
+
+    def validate_items(self,items):
+        if len(items) == 0:
+            raise serializers.ValidationError('sale should have atleast one item')
+        return items
+
+    def save(self, **kwargs):
+        self.instance = Purchase.objects.create(reciver_name=self.context['name'],pharmacy_id=self.context['pharmacy_pk'])
+        return self.instance
+    
+# ########## PHARMACY ##########
 
 class PharmacyListSerializer(serializers.ModelSerializer):
 
@@ -231,6 +292,7 @@ class PharmacySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return Pharmacy.objects.create(owner_id=self.context['owner_id'],**validated_data)
     
+# ########## EMPLOYEE ##########
 
 class EmployeeListSerializer(serializers.ModelSerializer):
 
@@ -288,5 +350,3 @@ class EmployeeCreateSerializer(UserCreateSerializer):
             Employee.objects.create(pharmacy_id=self.context['pharmacy_pk'],user=self.instance,**self.validated_data)
 
             return self.instance
-
-

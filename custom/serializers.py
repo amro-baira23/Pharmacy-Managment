@@ -10,7 +10,7 @@ class MyTokenObtain(TokenObtainPairSerializer):
         if self.user.is_owner:
             ph = Pharmacy.objects.filter(owner_id=self.user.id)
             type = 'O'
-            pharmacy_id = ph.id if ph.exists() else None
+            pharmacy_id = ph.first().id if ph.exists() else None
         else :
             type = None
 
