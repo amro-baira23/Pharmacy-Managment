@@ -5,8 +5,12 @@ from rest_framework import viewsets,response,status
 
 
 class MedicineViewset(viewsets.ModelViewSet):
-    permission_classes = [IsMember]
-
+    
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsMember()]
+        return [PharmacyOwnerOrManager()]
+        
     def get_queryset(self):
         return Medicine.objects.select_related('company').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=1)
     

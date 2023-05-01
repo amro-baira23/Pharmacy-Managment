@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext as _
 
 from rest_framework import serializers
 from djoser.serializers import UserCreateSerializer
@@ -55,7 +56,7 @@ class MedicineCreateSerializer(serializers.ModelSerializer):
 
     def validate_substances(self,sub):
         if len(set(sub)) != len(sub):
-            raise serializers.ValidationError("cant have dublicate in this array")
+            raise serializers.ValidationError(_("cant have dublicate in this array"))
         return sub 
     
     def validate_brand_name(self,name):
@@ -76,7 +77,7 @@ class MedicineCreateSerializer(serializers.ModelSerializer):
             medicine , created = Medicine.unique_medicine.get_or_create(ph_id,company,validated_data)
 
             if not created:
-                raise serializers.ValidationError({'error':'medicine with this data already exist'})
+                raise serializers.ValidationError({'error':_('medicine with this data already exist')})
             
             if substances:
                 validated_data.pop("substances")
@@ -136,9 +137,9 @@ class MedicineUpdateSerializer(serializers.ModelSerializer):
                 company, created = Company.objects.get_or_create(pharmacy_id=ph_id,name=com_name)
 
             try:
-                medicine = Medicine.unique_medicine.get(ph_id,company,validated_data)
+                medicine = Medicine.unique_medicine.get(ph_id,validated_data)
                 if medicine != instance:
-                    raise serializers.ValidationError({'error':'cant update medicine , with same data already exist'})
+                    raise serializers.ValidationError({'error':_('cant update medicine , with same data already exist')})
             except Medicine.DoesNotExist:
                 pass
             
@@ -161,7 +162,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         medicine = attrs.get('medicine')
         if medicine.pharmacy.id != int(self.context['pharmacy_pk']):
-            raise serializers.ValidationError('no medicine with such id for this pharmacy')
+            raise serializers.ValidationError(_('no medicine with such id for this pharmacy'))
         return super().validate(attrs)
 
     
@@ -171,7 +172,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             medicine.quantity -= quantity
             if medicine.quantity < 0:
-                raise serializers.ValidationError({'error':f'not enough medicine {medicine.brand_name} in enventory'})
+                raise serializers.ValidationError({'error':_('not enough medicine %(name)s in enventory') % {'name':medicine.brand_name}})
             medicine.save()
             return SaleItem.objects.create(sale=self.context['sale'],**validated_data)
 
@@ -204,7 +205,7 @@ class SaleCreateSerializer(serializers.ModelSerializer):
 
     def validate_items(self,items):
         if len(items) == 0:
-            raise serializers.ValidationError('sale should have atleast one item')
+            raise serializers.ValidationError(_('sale should have atleast one item'))
         return items
     
     def save(self, **kwargs):
@@ -221,7 +222,7 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         medicine = attrs.get('medicine')
         if medicine.pharmacy.id != int(self.context['pharmacy_pk']):
-            raise serializers.ValidationError('no medicine with such id for this pharmacy')
+            raise serializers.ValidationError(_('no medicine with such id for this pharmacy'))
         return super().validate(attrs)
     
     def create(self, validated_data):
@@ -264,7 +265,7 @@ class PurchaseCreateSerializer(serializers.ModelSerializer):
 
     def validate_items(self,items):
         if len(items) == 0:
-            raise serializers.ValidationError('sale should have atleast one item')
+            raise serializers.ValidationError(_('sale should have atleast one item'))
         return items
 
     def save(self, **kwargs):

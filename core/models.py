@@ -18,9 +18,8 @@ ROLE_CHOICES = [
 ################## MANAGERS ######################
 
 class MedicineManager(models.Manager):
-    def get(self,ph_id,company,data):
+    def get(self,ph_id,data):
         return Medicine.objects.get(pharmacy_id=ph_id,
-                                    company=company,
                                     type=data.get('type'),
                                     brand_name=data.get('brand_name'),
                                     barcode=data.get('barcode'))

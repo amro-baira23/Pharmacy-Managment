@@ -1,12 +1,18 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from core.models import Employee,Pharmacy
-
+from djoser.conf import settings
+from django.utils.translation import gettext as _
 
 class MyTokenObtain(TokenObtainPairSerializer):
 
+    default_error_messages = {
+        "no_active_account": settings.CONSTANTS.messages.INVALID_CREDENTIALS_ERROR,
+    }
+
     def validate(self, attrs):
         tokens = super().validate(attrs)
+
         if self.user.is_owner:
             ph = Pharmacy.objects.filter(owner_id=self.user.id)
             type = 'O'
@@ -20,6 +26,6 @@ class MyTokenObtain(TokenObtainPairSerializer):
                 pharmacy_id = em.pharmacy.id
                 type = em.role
             except Employee.DoesNotExist:
-                raise serializers.ValidationError('undifained user type')
+                raise serializers.ValidationError(_('undifained user type'))
 
         return {'type':type,'pharmacy_id':pharmacy_id,'tokens':tokens}

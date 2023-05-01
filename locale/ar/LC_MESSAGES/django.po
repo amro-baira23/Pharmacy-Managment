@@ -1,0 +1,71 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-05-01 12:22+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 "
+"&& n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5;\n"
+#: .\custom\admin.py:51
+msgid "Permissions"
+msgstr ""
+
+#: .\custom\admin.py:62
+msgid "Important dates"
+msgstr ""
+
+#: .\custom\constants.py:9
+msgid "Unable to log in with provided credentials."
+msgstr ""
+
+#: .\custom\models.py:10
+msgid "email address"
+msgstr ""
+
+#: .\custom\models.py:11
+msgid "first name"
+msgstr ""
+
+#: .\custom\models.py:12
+msgid "last name"
+msgstr ""
+
+#: .\custom\models.py:13
+msgid "is owner"
+msgstr ""
+
+msgid "undifained user type"
+msgstr "نوع مستخدم غير معروف"
+
+msgid "cant have dublicate in this array"
+msgstr "كل عنصر يمكن أن يوجد مرة واحدة"
+
+msgid "medicine with this data already exist"
+msgstr "يوجد دواء بمثل هذه البيانات بالفعل"
+
+msgid "you must enter a date in the present"
+msgstr "على تاريخ الصلاحية أن يكون في المستقبل"
+
+msgid "cant update medicine , with same data already exist"
+msgstr "فشل التحديث يوجد بالفعل دواء بالصفات المدخلة"
+
+msgid "no medicine with such id for this pharmacy"
+msgstr "لا يوجد دواء بهذا الرقم لهذه الصيدلية"
+
+msgid "not enough medicine %(name)s in enventory"
+msgstr "في الصيدلية %(name)s لا يوجد مايكفي من"
+
+msgid "sale should have atleast one item"
+msgstr "على الطلب أن يحوي عنصر واحد على الأقل"
