@@ -28,7 +28,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     'localhost',
-    '127.0.0.1'
+    '127.0.0.1',
+
+    '192.168.1.107'
 ]
 
 
@@ -54,6 +56,7 @@ MIDDLEWARE = [
     'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -62,6 +65,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'pharmacy.urls'
+
 
 TEMPLATES = [
     {
@@ -115,7 +119,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "ar-ar"
 
 TIME_ZONE = 'UTC'
 
@@ -123,6 +127,7 @@ USE_I18N = True
 
 USE_TZ = True
 
+LOCALE_PATHS = [BASE_DIR / 'locale/']
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
@@ -146,15 +151,12 @@ REST_FRAMEWORK = {
 DJOSER = {
     'SET_PASSWORD_RETYPE' : True,
     'USER_CREATE_PASSWORD_RETYPE':True
-#    'SERIALIZERS': {
-#        'user_create': 'core.serializers.UserCreateSerializer',
-#        'current_user': 'core.serializers.UserSerializer',
-#    }
 }
 
 SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=100)
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=100),
+    "TOKEN_OBTAIN_SERIALIZER": "custom.serializers.MyTokenObtain",
 }
 
 import mimetypes

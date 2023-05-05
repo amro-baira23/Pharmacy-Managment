@@ -1,6 +1,8 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
 from django.conf import settings
+
+from datetime import datetime
 from .validators import validate_old_date
 
 User = settings.AUTH_USER_MODEL
@@ -12,6 +14,32 @@ ROLE_CHOICES = [
     (EMPLOYEE,'Employee'),
     (MANAGER,'Manager'),
     ]
+
+################## MANAGERS ######################
+
+class MedicineManager(models.Manager):
+    def get(self,ph_id,data):
+        return Medicine.objects.get(pharmacy_id=ph_id,
+                                    type=data.get('type'),
+                                    brand_name=data.get('brand_name'),
+                                    barcode=data.get('barcode'))
+    
+    
+    def get_or_create(self,ph_id,company,data):
+        medicine , created = Medicine.objects.get_or_create(
+                                    pharmacy_id=ph_id,
+                                    type=data.pop('type'),
+                                    brand_name=data.pop('brand_name'),
+                                    barcode=data.pop('barcode'),
+                                    defaults= {
+                                        'company': company,
+                                        'quantity':data.get('quantity'),
+                                        'price':data.get('price'),
+                                        'need_prescription':data.get('need_prescription'),
+                                        'expiry_date':data.get('expiry_date')})
+        return medicine,created
+    
+################## MODLES ######################
 
 class Pharmacy(models.Model):
     owner = models.ForeignKey(User,on_delete=models.PROTECT,related_name='pharmacys')
@@ -27,6 +55,9 @@ class Pharmacy(models.Model):
 class Company(models.Model):
     name = models.CharField(max_length=50)
     pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
+
+    def __str__(self) -> str:
+        return self.name
 
     class Meta:
         unique_together = [['name', 'pharmacy']]
@@ -44,14 +75,14 @@ class Employee(models.Model):
 
 
 class Medicine(models.Model):
-    LIQUIDS = 'LI'
-    TABLETS = 'TA'
-    CAPSULES = 'CA'
-    DROPS = 'DR'
-    INJECTIONS = 'IN'
-    SUPPOSITORIES = 'SU'
-    INHALERS = 'IN'
-    TOPICALS = 'TO'
+    LIQUIDS = 'LIQ'
+    TABLETS = 'TAB'
+    CAPSULES = 'CAP'
+    DROPS = 'DRO'
+    INJECTIONS = 'INJ'
+    SUPPOSITORIES = 'SUP'
+    INHALERS = 'INH'
+    TOPICALS = 'TOP'
 
     TYPE_CHOICES = [
         (LIQUIDS,'Liquids'),
@@ -63,6 +94,7 @@ class Medicine(models.Model):
         (INHALERS, 'Inhalers'),
         (TOPICALS, 'Topicals')
     ]
+
     company = models.ForeignKey(Company,on_delete=models.PROTECT,related_name='medicines',null=True,blank=True)
     pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='medicines')
     brand_name = models.CharField(max_length=50)
@@ -72,14 +104,20 @@ class Medicine(models.Model):
     need_prescription = models.BooleanField(default=0)
     is_active = models.BooleanField(default=1)
     expiry_date = models.DateField(validators=[validate_old_date])
-    type = models.CharField(max_length=2,choices=TYPE_CHOICES)
+    type = models.CharField(max_length=3,choices=TYPE_CHOICES)
+
+    objects = models.Manager()
+    unique_medicine = MedicineManager()
 
     def __str__(self) -> str:
         return self.brand_name
+
+    def is_expired(self):
+        return datetime.now().date() > self.expiry_date
     
     class Meta:
         ordering = ['brand_name']
-        unique_together = [['company', 'pharmacy', 'type', 'brand_name', 'barcode']]
+        unique_together = [['pharmacy','type', 'brand_name', 'barcode']]
     
 
 class Substance(models.Model):
@@ -112,10 +150,13 @@ class Sale(models.Model):
     class Meta:
         ordering = ['time_stamp']
 
+    def time(self):
+        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
+
 
 class SaleItem(models.Model):
     medicine = models.ForeignKey(Medicine,on_delete=models.PROTECT,related_name='bill_items')
-    sale = models.ForeignKey(Sale,on_delete=models.PROTECT,related_name='items')
+    sale = models.ForeignKey(Sale,on_delete=models.CASCADE,related_name='items')
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
     
@@ -133,6 +174,9 @@ class Purchase(models.Model):
 
     class Meta:
         ordering = ['time_stamp']
+
+    def time(self):
+        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
 
 
 class PurchaseItem(models.Model):

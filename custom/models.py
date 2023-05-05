@@ -10,6 +10,7 @@ class User(AbstractUser):
     email = models.EmailField(_("email address"),validators=[validate_hotmail_or_gmail_email],unique=True)
     first_name = models.CharField(_("first name"), max_length=50,)
     last_name = models.CharField(_("last name"), max_length=50)
+    is_owner = models.BooleanField(_("is owner"),default=0)
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
