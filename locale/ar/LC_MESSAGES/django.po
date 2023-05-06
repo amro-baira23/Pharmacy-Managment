@@ -84,3 +84,12 @@ msgstr "شركة"
 
 msgid "some items are invalid"
 msgstr "بعض العناصر غير صالحة"
+
+msgid "sale item should be dict"
+msgstr "على العنصر المباع أن يكون قاموس"
+
+msgid "sale item should have have medicine quantity and price only"
+msgstr "على العنصر المباع أن يحوي سعر وكمية ودواء محدد"
+
+msgid "same item in the sale with diffrent price exist"
+msgstr "يوجد دواء مكرر بسعر مختلف ضمن الطلب"

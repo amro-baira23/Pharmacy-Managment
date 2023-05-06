@@ -95,13 +95,7 @@ class SaleViewset(viewsets.ModelViewSet):
 
 
     def perform_create(self, serializer):
-        items = self.request.data.get('items')
-        print(self.request.data)
-        for item in items:
-            for idx2,item2 in enumerate(items):
-                if item['medicine'] == item2['medicine'] and item is not item2:
-                    item['quantity'] += item2['quantity']
-                    items.pop(idx2)
+        items = serializer.validated_data['items']
 
         with transaction.atomic():
             sale = serializer.save()

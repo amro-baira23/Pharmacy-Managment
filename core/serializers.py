@@ -200,17 +200,32 @@ class SaleSerizlizer(serializers.ModelSerializer):
 
 class SaleCreateSerializer(serializers.ModelSerializer):
     items = serializers.ListField(child=serializers.JSONField(),write_only=True)
-    item = SaleItemSerializer(many=True,read_only=True)
     class Meta:
         model = Sale
-        fields = ['item','items']
+        fields = ['items']
 
 
     def validate_items(self,items):
         if len(items) == 0:
             raise serializers.ValidationError(_('sale should have atleast one item'))
+        
+        for item in items:
+            if type(item) is not dict:
+                raise serializers.ValidationError(_('sale item should be dict'))
+            
+            if list(item.keys()) != ['medicine','quantity','price']:
+                raise serializers.ValidationError(_('sale item should have have medicine quantity and price only'))
+
+        for item in items:
+            for idx2,item2 in enumerate(items):
+                if item['medicine'] == item2['medicine'] and item is not item2:
+                    if item['price'] != item2['price']:
+                        raise serializers.ValidationError(_('same item in the sale with diffrent price exist'))
+                    item['quantity'] += item2['quantity']
+                    items.pop(idx2)
+  
         return items
-    
+
     def save(self, **kwargs):
         self.instance = Sale.objects.create(pharmacy_id=self.context['pharmacy_pk'],seller_name=self.context['name'])
         return self.instance
