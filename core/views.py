@@ -2,6 +2,7 @@ from .models import *
 from .serializers import *
 from .permissions import *
 from rest_framework import viewsets,response,status
+from django.utils.translation import gettext as _
 
 
 class MedicineViewset(viewsets.ModelViewSet):
@@ -24,7 +25,13 @@ class MedicineViewset(viewsets.ModelViewSet):
     def get_serializer_context(self):
         return {'pharmacy_pk':self.kwargs['pharmacy_pk']}
          
-   
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if SaleItem.objects.filter(medicine=instance).exists():
+            return response.Response({'error':_('cant delete a medicine which sold once but you can archive it')})
+        instance.delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
+
 class PurchaseViewset(viewsets.ModelViewSet):
     permission_classes = [PharmacyOwnerOrManager]
     serializer_class = PurchaseSerializer
@@ -89,7 +96,7 @@ class SaleViewset(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         items = self.request.data.get('items')
-
+        print(self.request.data)
         for item in items:
             for idx2,item2 in enumerate(items):
                 if item['medicine'] == item2['medicine'] and item is not item2:
@@ -100,7 +107,8 @@ class SaleViewset(viewsets.ModelViewSet):
             sale = serializer.save()
             new_context = {'sale':sale,'pharmacy_pk':self.kwargs['pharmacy_pk']}
             item_serializer = SaleItemSerializer(data=items,many=True,context=new_context)
-            item_serializer.is_valid(raise_exception=True)
+            if not item_serializer.is_valid():
+                raise serializers.ValidationError({'error':_('some items are invalid')})
             item_serializer.save()
 
 

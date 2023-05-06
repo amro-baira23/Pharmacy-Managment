@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 
 from datetime import datetime
 from .validators import validate_old_date
@@ -46,10 +47,14 @@ class Pharmacy(models.Model):
     name = models.CharField(max_length=50)
     city = models.CharField(max_length=50)
     street = models.CharField(max_length=50)
-    phone_number = models.CharField(max_length=10,validators=[MinLengthValidator(10)],unique=True)
+    phone_number = models.CharField(_("phone_number"),max_length=10,validators=[MinLengthValidator(10)],unique=True)
 
     def __str__(self) -> str:
         return self.name
+    
+    class Meta:
+        verbose_name = _("pharmacy")
+        verbose_name_plural = _("pharmacy")
     
 
 class Company(models.Model):
@@ -60,6 +65,8 @@ class Company(models.Model):
         return self.name
 
     class Meta:
+        verbose_name = _("company")
+        verbose_name_plural = _("company")
         unique_together = [['name', 'pharmacy']]
 
 
@@ -137,6 +144,9 @@ class MedicineSubstance(models.Model):
 
     class Meta:
         unique_together = [['substance','medicine']]
+
+    def __str__(self) -> str:
+        return self.substance.name
 
 
 class Sale(models.Model):

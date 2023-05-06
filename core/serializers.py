@@ -21,6 +21,7 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class MedicineListSerializer(serializers.ModelSerializer):
     company = serializers.StringRelatedField()
+    medicine_substances = serializers.ListSerializer(child=serializers.StringRelatedField())
     class Meta:
         model = Medicine
         fields = [
@@ -32,7 +33,8 @@ class MedicineListSerializer(serializers.ModelSerializer):
             'brand_name',
             'barcode',
             'company',
-            'type'
+            'type',
+            'medicine_substances'
         ]
   
 
@@ -197,10 +199,11 @@ class SaleSerizlizer(serializers.ModelSerializer):
 
 
 class SaleCreateSerializer(serializers.ModelSerializer):
-    items = SaleItemSerializer(many=True)
+    items = serializers.ListField(child=serializers.JSONField(),write_only=True)
+    item = SaleItemSerializer(many=True,read_only=True)
     class Meta:
         model = Sale
-        fields = ['items']
+        fields = ['item','items']
 
 
     def validate_items(self,items):
