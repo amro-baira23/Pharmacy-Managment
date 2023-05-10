@@ -93,3 +93,9 @@ msgstr "على العنصر المباع أن يحوي سعر وكمية ودو�
 
 msgid "same item in the sale with diffrent price exist"
 msgstr "يوجد دواء مكرر بسعر مختلف ضمن الطلب"
+
+msgid "salry"
+msgstr "الراتب"
+
+msgid "role"
+msgstr "الدور"
