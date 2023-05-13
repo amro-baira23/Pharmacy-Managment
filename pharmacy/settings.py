@@ -119,7 +119,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
-LANGUAGE_CODE = "ar-ar"
+LANGUAGE_CODE = "en-US"
 
 TIME_ZONE = 'UTC'
 
@@ -127,7 +127,9 @@ USE_I18N = True
 
 USE_TZ = True
 
-LOCALE_PATHS = [BASE_DIR / 'locale/']
+LOCALE_PATHS = [
+            BASE_DIR / 'locale/'
+            ]
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
@@ -155,7 +157,8 @@ DJOSER = {
 
 SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=100),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=999),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1000),
     "TOKEN_OBTAIN_SERIALIZER": "custom.serializers.MyTokenObtain",
 }
 

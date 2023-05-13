@@ -1,8 +1,8 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 
-from datetime import datetime
 from .validators import validate_old_date
 
 User = settings.AUTH_USER_MODEL
@@ -15,95 +15,116 @@ ROLE_CHOICES = [
     (MANAGER,'Manager'),
     ]
 
+LIQUIDS = 'LIQ'
+TABLETS = 'TAB'
+CAPSULES = 'CAP'
+DROPS = 'DRO'
+INJECTIONS = 'INJ'
+SUPPOSITORIES = 'SUP'
+INHALERS = 'INH'
+TOPICALS = 'TOP'
+
+TYPE_CHOICES = [
+    (LIQUIDS,'Liquids'),
+    (TABLETS, 'Tablets'),
+    (CAPSULES, 'Capsules'),
+    (DROPS, 'Drops'),
+    (INJECTIONS, 'Injections'),
+    (SUPPOSITORIES, 'Suppositories'),
+    (INHALERS, 'Inhalers'),
+    (TOPICALS, 'Topicals')
+]
+
+
+
+SATURDAY = 'SA'
+SUNDAY = 'SU'
+MONDAY = 'MO'
+TUESDAY = 'TU'
+WEDNESDAY = "WE"
+THURSDAY = 'TH'
+FRIDAY = "FR"
+
+DAY_CHOICES = [
+    (SATURDAY,'Saturday'),
+    (SUNDAY, 'Sunday'),
+    (MONDAY, 'Monday'),
+    (TUESDAY, 'Tuesday'),
+    (WEDNESDAY, 'Wednesday'),
+    (THURSDAY, 'Thursday'),
+    (FRIDAY, 'Friday'),
+]
+
+EXPIRY_NOT = "E"
+AMOUNT_NOT = "A"
+
+NOTIFICATION_CHOICES = [
+    (EXPIRY_NOT,'Expiry notification'),
+    (AMOUNT_NOT,'Amount notification'),
+]
+
 ################## MANAGERS ######################
 
 class MedicineManager(models.Manager):
     def get(self,ph_id,data):
-        return Medicine.objects.get(pharmacy_id=ph_id,
+        return Medicine.objects.get(
                                     type=data.get('type'),
                                     brand_name=data.get('brand_name'),
                                     barcode=data.get('barcode'))
     
     
-    def get_or_create(self,ph_id,company,data):
+    def get_or_create(self,data):
         medicine , created = Medicine.objects.get_or_create(
-                                    pharmacy_id=ph_id,
                                     type=data.pop('type'),
                                     brand_name=data.pop('brand_name'),
                                     barcode=data.pop('barcode'),
                                     defaults= {
-                                        'company': company,
-                                        'quantity':data.get('quantity'),
-                                        'price':data.get('price'),
-                                        'need_prescription':data.get('need_prescription'),
-                                        'expiry_date':data.get('expiry_date')})
+                                        'company': data.pop('company'),
+                                        'sale_price':data.get('sale_price'),
+                                        'purchase_price':data.get('purchase_price'),
+                                        'need_prescription':data.get('need_prescription')
+                                        })
         return medicine,created
     
+
 ################## MODLES ######################
 
 class Pharmacy(models.Model):
-    owner = models.ForeignKey(User,on_delete=models.PROTECT,related_name='pharmacys')
     name = models.CharField(max_length=50)
     city = models.CharField(max_length=50)
     street = models.CharField(max_length=50)
-    phone_number = models.CharField(max_length=10,validators=[MinLengthValidator(10)],unique=True)
+    region = models.CharField(max_length=50)
+    phone_number = models.CharField(_("phone_number"),max_length=10,validators=[MinLengthValidator(7)],unique=True)
 
     def __str__(self) -> str:
         return self.name
     
+    class Meta:
+        verbose_name = _("pharmacy")
+        verbose_name_plural = _("pharmacy")
+    
 
 class Company(models.Model):
-    name = models.CharField(max_length=50)
-    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
+    name = models.CharField(max_length=50,primary_key=True)
+    phone_number = models.CharField(_("phone_number"),max_length=10,validators=[MinLengthValidator(7)],unique=True)
 
     def __str__(self) -> str:
         return self.name
 
     class Meta:
-        unique_together = [['name', 'pharmacy']]
-
-
-class Employee(models.Model):
-    user = models.OneToOneField(User,on_delete=models.CASCADE)
-    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='employees')
-    phone_number = models.CharField(max_length=10,validators=[MinLengthValidator(10)],unique=True)
-    salry = models.PositiveIntegerField()
-    role = models.CharField(choices=ROLE_CHOICES,max_length=1,default=EMPLOYEE)
-
-    def __str__(self) -> str:
-        return self.user.first_name + ' ' + self.user.last_name
+        verbose_name = _("company")
+        verbose_name_plural = _("company")
 
 
 class Medicine(models.Model):
-    LIQUIDS = 'LIQ'
-    TABLETS = 'TAB'
-    CAPSULES = 'CAP'
-    DROPS = 'DRO'
-    INJECTIONS = 'INJ'
-    SUPPOSITORIES = 'SUP'
-    INHALERS = 'INH'
-    TOPICALS = 'TOP'
-
-    TYPE_CHOICES = [
-        (LIQUIDS,'Liquids'),
-        (TABLETS, 'Tablets'),
-        (CAPSULES, 'Capsules'),
-        (DROPS, 'Drops'),
-        (INJECTIONS, 'Injections'),
-        (SUPPOSITORIES, 'Suppositories'),
-        (INHALERS, 'Inhalers'),
-        (TOPICALS, 'Topicals')
-    ]
-
-    company = models.ForeignKey(Company,on_delete=models.PROTECT,related_name='medicines',null=True,blank=True)
-    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='medicines')
+    company = models.ForeignKey(Company,related_name='medicines',on_delete=models.PROTECT)
     brand_name = models.CharField(max_length=50)
     barcode = models.CharField(max_length=13,validators=[MinLengthValidator(13)])
-    quantity = models.PositiveIntegerField()
-    price = models.PositiveIntegerField()
+    sale_price = models.PositiveIntegerField()
+    purchase_price = models.PositiveIntegerField()
     need_prescription = models.BooleanField(default=0)
+    min_quanity = models.PositiveIntegerField()
     is_active = models.BooleanField(default=1)
-    expiry_date = models.DateField(validators=[validate_old_date])
     type = models.CharField(max_length=3,choices=TYPE_CHOICES)
 
     objects = models.Manager()
@@ -112,78 +133,99 @@ class Medicine(models.Model):
     def __str__(self) -> str:
         return self.brand_name
 
-    def is_expired(self):
-        return datetime.now().date() > self.expiry_date
-    
     class Meta:
         ordering = ['brand_name']
-        unique_together = [['pharmacy','type', 'brand_name', 'barcode']]
+        unique_together = [['type', 'brand_name', 'barcode']]
     
 
-class Substance(models.Model):
+class EqualMedicine(models.Model):
+    medicine = models.OneToOneField(Medicine,primary_key=True,on_delete=models.CASCADE)
     name = models.CharField(max_length=50)
-    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE,related_name='substances')
-
-    def __str__(self) -> str:
-        return self.name
-    
-    class Meta:
-        unique_together = [['name','pharmacy']]
-
-
-class MedicineSubstance(models.Model):
-    substance = models.ForeignKey(Substance,on_delete=models.PROTECT)
-    medicine = models.ForeignKey(Medicine,on_delete=models.CASCADE,related_name='medicine_substances')
-
-    class Meta:
-        unique_together = [['substance','medicine']]
 
 
 class Sale(models.Model):
-    seller_name = models.CharField(max_length=100)
+    pharmacy = models.ForeignKey(Pharmacy,related_name='sales',on_delete=models.PROTECT)
+    seller = models.ForeignKey(User,related_name='sales',on_delete=models.PROTECT)
     time_stamp = models.DateTimeField(auto_now_add=True)
-    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
+    doctor_name = models.CharField(max_length=255,blank=True,null=True)
+    coustomer_name = models.CharField(max_length=255,blank=True,null=True)
 
     def __str__(self) -> str:
-        return self.seller_name
-    
-    class Meta:
-        ordering = ['time_stamp']
+        return self.seller.first_name
 
     def time(self):
         return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
 
 
 class SaleItem(models.Model):
-    medicine = models.ForeignKey(Medicine,on_delete=models.PROTECT,related_name='bill_items')
-    sale = models.ForeignKey(Sale,on_delete=models.CASCADE,related_name='items')
+    medicine = models.ForeignKey(Medicine,related_name='sale_items',on_delete=models.PROTECT)
+    sale = models.ForeignKey(Sale,related_name='items',on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
+    expiry_date = models.DateField()
     
     class Meta:
         unique_together = [['medicine','sale']]
 
 
 class Purchase(models.Model):
-    reciver_name = models.CharField(max_length=100)
+    pharmacy = models.ForeignKey(Pharmacy,related_name='purchases',on_delete=models.PROTECT)
+    reciver = models.ForeignKey(User,related_name='purchases',on_delete=models.PROTECT)
     time_stamp = models.DateTimeField(auto_now_add=True)
-    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
 
     def __str__(self) -> str:
-        return self.reciver_name
-
-    class Meta:
-        ordering = ['time_stamp']
+        return self.reciver.first_name
 
     def time(self):
         return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
 
 
 class PurchaseItem(models.Model):
-    medicine = models.ForeignKey(Medicine,on_delete=models.PROTECT,related_name='purchase_items')
-    purchase = models.ForeignKey(Purchase,on_delete=models.PROTECT,related_name='items')
+    medicine = models.ForeignKey(Medicine,related_name='purchase_items',on_delete=models.PROTECT)
+    purchase = models.ForeignKey(Purchase,related_name='items',on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
+    expiry_date = models.DateField(validators=[validate_old_date])
 
     class Meta:
         unique_together = [['medicine','purchase']]
+
+
+class Role(models.Model):
+    name = models.CharField(max_length=255,primary_key=True)
+
+    def __str__(self):
+        return self.name
+
+
+class UserRole(models.Model):
+    user = models.ForeignKey(User,related_name='roles',on_delete=models.CASCADE)
+    role = models.ForeignKey(Role,related_name='roles',on_delete=models.PROTECT)
+
+    def __str__(self):
+        return self.role.name
+
+    class Meta:
+        unique_together = [['user','role']]
+
+
+class Day(models.Model):
+    name = models.CharField(choices=DAY_CHOICES,max_length=9,unique=True)
+
+
+class WorkTime(models.Model):
+    user = models.ForeignKey(User,related_name='work_times',on_delete=models.CASCADE)
+    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
+    day = models.ForeignKey(Day,on_delete=models.PROTECT)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    class Meta:
+        unique_together = [['user','day']]
+
+
+class Notification(models.Model):
+    medicine = models.ForeignKey(Medicine,related_name='notifications',on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    body = models.CharField(max_length=255)
+    type = models.CharField(choices=NOTIFICATION_CHOICES,max_length=1)

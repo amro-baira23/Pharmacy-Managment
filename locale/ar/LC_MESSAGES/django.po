@@ -69,3 +69,33 @@ msgstr "في الصيدلية %(name)s لا يوجد مايكفي من"
 
 msgid "sale should have atleast one item"
 msgstr "على الطلب أن يحوي عنصر واحد على الأقل"
+
+msgid "cant delete a medicine which sold once but you can archive it"
+msgstr "لا يمكن حذف دواء تم بيعه سابقا يمكنك القيام بأرشفته عوضا عن ذلك"
+
+msgid "phone_number"
+msgstr "رقم الهاتف"
+
+msgid "pharmacy"
+msgstr "صيدلية"
+
+msgid "company"
+msgstr "شركة"
+
+msgid "some items are invalid"
+msgstr "بعض العناصر غير صالحة"
+
+msgid "sale item should be dict"
+msgstr "على العنصر المباع أن يكون قاموس"
+
+msgid "sale item should have have medicine quantity and price only"
+msgstr "على العنصر المباع أن يحوي سعر وكمية ودواء محدد"
+
+msgid "same item in the sale with diffrent price exist"
+msgstr "يوجد دواء مكرر بسعر مختلف ضمن الطلب"
+
+msgid "salry"
+msgstr "الراتب"
+
+msgid "role"
+msgstr "الدور"
