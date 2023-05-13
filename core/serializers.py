@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
+from django.contrib.auth.models import Group
 
 from rest_framework import serializers
 from djoser.serializers import UserCreatePasswordRetypeSerializer as UCPR
@@ -24,68 +25,40 @@ User = get_user_model()
 #        model = Medicine
 #        fields = [
 #            'id',
-#            'quantity',
-#            'price',
-#            'need_prescription',
-#            'is_expired',
 #            'brand_name',
 #            'barcode',
-#            'company',
+#            'sale_price',
+#            'purchase_price',
 #            'type',
+#            'need_prescription',
+#            'company',
 #        ]
 #  
 #
 #class MedicineCreateSerializer(serializers.ModelSerializer):
-#    company_name = serializers.CharField(max_length=50,write_only=True,required=False,allow_blank=True)
+#    company = serializers.CharField(write_only=True,max_length=50)
 #    class Meta:
 #        model = Medicine
 #        fields = [
 #            'id',
-#            'company_name',
+#            'company',
 #            'brand_name',
 #            'barcode',
-#            'price',
+#            'sale_price',
+#            'purchase_price',
 #            'need_prescription',
 #            'type',
-#            'substances'
 #        ]
-#
-#    
-#    def validate_brand_name(self,name):
-#        return name.capitalize()
 #  
 #    def create(self, validated_data):
-#        name = validated_data.get('company_name')
-#        substances = validated_data.get('substances')
-#        ph_id = self.context['pharmacy_pk']
-#        company = None
-#
 #        with transaction.atomic():
-#            if name:
-#                name = name.capitalize()
-#                validated_data.pop('company_name')
-#                company, created = Company.objects.get_or_create(pharmacy_id=ph_id,name=name)
 #            
-#            medicine , created = Medicine.unique_medicine.get_or_create(ph_id,company,validated_data)
+#            company , created = Company.objects.get_or_create(name=validated_data.pop('company'))
+#            validated_data['company'] = company
 #
+#            medicine , created = Medicine.unique_medicine.get_or_create(validated_data)
 #            if not created:
 #                raise serializers.ValidationError({'error':_('medicine with this data already exist')})
-#            
-#            if substances:
-#                validated_data.pop("substances")
-#                valid_subs = list(Substance.objects.filter(pharmacy_id=ph_id,name__in=substances))
-#            
-#                for sub in valid_subs:
-#                     if sub.name in substances:
-#                         substances.remove(sub.name)
-#            
-#                created_substances = [Substance.objects.create(name=name,pharmacy_id=ph_id) for name in substances]
-#
-#                all_sub = created_substances + valid_subs
-#
-#                final_subs = [MedicineSubstance(medicine=medicine,substance=sub) for sub in all_sub]
-#                MedicineSubstance.objects.bulk_create(final_subs)
-#
 #            return medicine
 #        
 #
@@ -98,9 +71,8 @@ User = get_user_model()
 #            'barcode',
 #            'company_name',
 #            'type',
-#            'quantity',
-#            'price',
-#            'expiry_date',
+#            'sale_price',
+#            'purchase_price',
 #            'need_prescription',
 #            'is_active'
 #        ]
@@ -112,7 +84,6 @@ User = get_user_model()
 #        return company_name.capitalize()
 #
 #    def update(self, instance, validated_data):
-#
 #        ph_id = self.context['pharmacy_pk']
 #        com_name = validated_data.get('company_name')
 #        company = instance.company if instance.company is not None and self.partial else None
@@ -138,7 +109,7 @@ User = get_user_model()
 #            instance.company = company
 #            instance = super().update(instance, validated_data)
 #            return instance
-#
+
 ## ########## SALEITEM ##########
 #    
 #class SaleItemSerializer(serializers.ModelSerializer):
@@ -280,6 +251,15 @@ User = get_user_model()
 #        self.instance = Purchase.objects.create(reciver_name=self.context['name'],pharmacy_id=self.context['pharmacy_pk'])
 #        return self.instance
 #    
+
+## ########## ROLES ##########
+
+class UserRoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserRole
+        fields = ['id','role']
+
+
 ## ########## PHARMACY ##########
 #
 
@@ -292,7 +272,7 @@ class PharmacyListSerializer(serializers.ModelSerializer):
 class PharmacySerializer(serializers.ModelSerializer):
     class Meta:
         model = Pharmacy
-        fields = ['name','city','street','phone_number']
+        fields = ['name','city','street','region','phone_number']
 
     
 ## ########## EMPLOYEE ##########
@@ -304,17 +284,86 @@ class EmployeeListSerializer(serializers.ModelSerializer):
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
+    roles = UserRoleSerializer(many=True,read_only=True)
     class Meta:
         model = User
-        fields = ['id','first_name', 'last_name', 'email', 'phone_number', 'salry', 'role', 'pharmacy']
+        fields = ['id','first_name', 'last_name', 'email', 'phone_number', 'salry', 'pharmacy','roles']
 
+class EmployeeUpdateSerializer(serializers.ModelSerializer):
+    roles = serializers.ListField(child=serializers.BooleanField(),min_length=4,max_length=4,write_only=True)
+    class Meta:
+        model = User
+        fields = ['first_name','last_name','phone_number','salry','roles']
+
+    def validate_roles(self,roles):
+        for i in roles:
+            if i:
+                return roles
+        raise serializers.ValidationError("atleast one value shoud be true")
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            roles = validated_data.pop('roles')
+            instance = super().update(instance, validated_data)
+
+            pre_roles = ['saller','purcher','pharmacy_manager','manager']
+            in_roles = []
+            out_roles = []
+
+            user_roles = instance.roles.all()
+            names = user_roles.values_list('role',flat=True)
+
+            for idx,i in enumerate(roles):
+                if i :
+                    if pre_roles[idx] not in names: 
+                        in_roles.append((UserRole(role_id=pre_roles[idx],user=instance)))
+                else:
+                    out_roles.append(pre_roles[idx])
+
+            print(in_roles)
+            print(out_roles)
+    
+            instance.roles.filter(role__in=out_roles).delete()
+
+            UserRole.objects.bulk_create(in_roles)
+
+            return instance
+    
 
 class EmployeeCreateSerializer(UCPR):
-    role = serializers.ChoiceField(ROLE_CHOICES)
+    roles = serializers.ListField(child=serializers.BooleanField(),min_length=4,max_length=4,write_only=True)
     class Meta:
         model = User
-        fields = UCPR.Meta.fields + ('role',)
+        fields = UCPR.Meta.fields + ("roles",)
+
+    def validate_roles(self,roles):
+        for i in roles:
+            if i:
+                return roles
+        raise serializers.ValidationError("atleast one value shoud be true")
+
+    def validate(self, attrs):
+        print(attrs)
+        roles = attrs.get("roles")
+        del attrs['roles']
+        super().validate(attrs)
+        attrs['roles'] = roles
+        return attrs
 
     def create(self, validated_data):
+        roles = validated_data.pop('roles')
         validated_data['pharmacy_id'] = self.context['pharmacy']
-        return super().create(validated_data)
+
+        user = super().create(validated_data)
+
+        pre_roles = ['saller','purcher','pharmacy_manager','manager']
+        user_perms = []
+
+        for idx,i in enumerate(roles):
+            if i:
+               user_perms.append(UserRole(role_id=pre_roles[idx],user=user)) 
+
+        UserRole.objects.bulk_create(user_perms)
+
+        return user
+    

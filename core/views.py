@@ -1,19 +1,24 @@
+from rest_framework import viewsets,response,status
+from django.utils.translation import gettext as _
+
 from .models import *
 from .serializers import *
 from .permissions import *
-from rest_framework import viewsets,response,status,views
-from django.utils.translation import gettext as _
 
 class PharmacyViewSet(viewsets.ModelViewSet):
+
     def get_queryset(self):
-        if self.request.user.is_owner:
+        user = self.request.user
+        if 'manager' in user.roles.values_list('role',flat=True):
             return Pharmacy.objects.all()
-        return Pharmacy.objects.filter(id=self.request.user.pharmacy_id)
+        return Pharmacy.objects.filter(id=user.pharmacy_id)
+
     
     def get_permissions(self):
-        if self.action == 'retrieve':
-            return [IsMember()]
-        return [IsOwner()]
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(),ManagmentPermission()]
+
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -22,6 +27,14 @@ class PharmacyViewSet(viewsets.ModelViewSet):
     
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+
+        if Purchase.objects.filter(pharmacy=instance).exists():
+            return response.Response({'detail':'cant delete when there are purchase'})
+
+        
+        if Sale.objects.filter(pharmacy=instance).exists():
+            return response.Response({'detail':'cant delete when there are sales'})
+
         with transaction.atomic():
             instance.employees.all().delete()
             instance.delete()
@@ -29,20 +42,29 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
 
 class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
-    permission_classes = [PharmacyOwner]
+    permission_classes = [permissions.IsAuthenticated,ManagmentPermission]
+    http_method_names = ['get','put','delete','post']
 
     def get_queryset(self):
-        return User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+        return User.objects.prefetch_related('roles').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
     
     def get_serializer_class(self):
         if self.action == 'list':
             return EmployeeListSerializer
-        if self.action == 'create':
+        elif self.action == 'create' :
             return EmployeeCreateSerializer
+        elif self.action in ['update','partial_update'] :
+            return EmployeeUpdateSerializer
         return EmployeeSerializer
     
     def get_serializer_context(self):
         return {'pharmacy':self.kwargs['pharmacy_pk']}
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_active = False
+        instance.save()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
     
 
 #class MedicineViewset(viewsets.ModelViewSet):
@@ -50,10 +72,10 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
 #    def get_permissions(self):
 #        if self.request.method == 'GET':
 #            return [IsMember()]
-#        return [PharmacyOwnerOrManager()]
+#        return [EmployeePermission()]
 #        
 #    def get_queryset(self):
-#        return Medicine.objects.select_related('company').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=1)
+#        return Medicine.objects.all()
 #    
 #    def get_serializer_class(self):
 #        if self.action == 'update' or self.action == 'partial_update':
@@ -61,9 +83,6 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
 #        if self.action == 'create':
 #            return MedicineCreateSerializer
 #        return MedicineListSerializer
-#
-#    def get_serializer_context(self):
-#        return {'pharmacy_pk':self.kwargs['pharmacy_pk']}
 #         
 #    def destroy(self, request, *args, **kwargs):
 #        instance = self.get_object()
@@ -71,7 +90,7 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
 #            return response.Response({'error':_('cant delete a medicine which sold once but you can archive it')})
 #        instance.delete()
 #        return response.Response(status=status.HTTP_204_NO_CONTENT)
-#
+
 #
 #class PurchaseViewset(viewsets.ModelViewSet):
 #    permission_classes = [PharmacyOwnerOrManager]

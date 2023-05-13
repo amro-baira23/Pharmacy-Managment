@@ -15,9 +15,7 @@ class User(AbstractUser):
     last_name = models.CharField(_("last name"), max_length=50)
     phone_number = models.CharField(_("phone_number"),max_length=10,validators=[MinLengthValidator(10)],unique=True)
     salry = models.PositiveIntegerField(_("salry"))
-    is_owner = models.BooleanField(_("is owner"),default=0)
     pharmacy = models.ForeignKey(Pharmacy,related_name='employees',null=True,blank=True,on_delete=models.CASCADE)
-    role = models.CharField(_("role"),choices=ROLE_CHOICES,max_length=1,default=EMPLOYEE)
 
     objects = UserManager()
 
@@ -29,3 +27,4 @@ class User(AbstractUser):
 
     def name(self):
         return self.first_name + ' ' + self.last_name
+    

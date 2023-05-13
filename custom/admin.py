@@ -14,7 +14,7 @@ class UserCreationForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ['email', 'first_name','last_name','is_owner','phone_number','salry','pharmacy','role',]
+        fields = ['email', 'first_name','last_name','phone_number','salry','pharmacy']
 
     def clean_password2(self):
         password1 = self.cleaned_data.get("password1")
@@ -36,7 +36,7 @@ class UserChangeForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ['email', 'password', 'first_name', 'last_name', 'phone_number', 'salry', 'pharmacy', 'role', 'is_active', 'is_staff']
+        fields = ['email', 'password', 'first_name', 'last_name', 'phone_number', 'salry', 'pharmacy', 'is_active', 'is_staff']
 
 
 class UserAdmin(BaseUserAdmin):
@@ -46,7 +46,7 @@ class UserAdmin(BaseUserAdmin):
     list_display = ['email', 'first_name', 'last_name' , 'is_staff']
     list_filter = ['is_staff']
     fieldsets = (
-        (None, {"fields": ("first_name", "last_name", "email", 'phone_number', 'salry', 'pharmacy', 'role' , "password")}),
+        (None, {"fields": ("first_name", "last_name", "email", 'phone_number', 'salry', 'pharmacy', "password")}),
         (
             _("Permissions"),
             {
@@ -64,7 +64,7 @@ class UserAdmin(BaseUserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'first_name', 'last_name', 'is_owner', 'phone_number', 'salry', 'pharmacy', 'role', 'password1', 'password2'),
+            'fields': ('email', 'first_name', 'last_name', 'phone_number', 'salry', 'pharmacy', 'password1', 'password2'),
         }),
     )
     search_fields = ['email' , 'first_name' , 'last_name']
