@@ -37,13 +37,13 @@ TYPE_CHOICES = [
 
 
 
-SATURDAY = 'SA'
-SUNDAY = 'SU'
-MONDAY = 'MO'
-TUESDAY = 'TU'
-WEDNESDAY = "WE"
-THURSDAY = 'TH'
-FRIDAY = "FR"
+SATURDAY = 'Saturday'
+SUNDAY = 'Sunday'
+MONDAY = 'Monday'
+TUESDAY = 'Tuesday'
+WEDNESDAY = "Wednesday"
+THURSDAY = 'Thursday'
+FRIDAY = "Friday"
 
 DAY_CHOICES = [
     (SATURDAY,'Saturday'),
@@ -212,17 +212,28 @@ class UserRole(models.Model):
 class Day(models.Model):
     name = models.CharField(choices=DAY_CHOICES,max_length=9,unique=True)
 
+    def __str__(self) -> str:
+        return self.name
 
-class WorkTime(models.Model):
-    user = models.ForeignKey(User,related_name='work_times',on_delete=models.CASCADE)
-    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
-    day = models.ForeignKey(Day,on_delete=models.PROTECT)
+
+class Shift(models.Model):
+    name = models.CharField(max_length=255,unique=True)
     start_time = models.TimeField()
     end_time = models.TimeField()
 
-    class Meta:
-        unique_together = [['user','day']]
+    def __str__(self) -> str:
+        return self.name
 
+
+class ShiftDay(models.Model):
+    shift = models.ForeignKey(Shift,related_name='days',on_delete=models.CASCADE)
+    day = models.ForeignKey(Day,on_delete=models.PROTECT)
+
+    def __str__(self) -> str:
+        return self.shift.name + ' ' + self.day.name
+
+    class Meta:
+        unique_together = [['shift','day']]
 
 class Notification(models.Model):
     medicine = models.ForeignKey(Medicine,related_name='notifications',on_delete=models.CASCADE)

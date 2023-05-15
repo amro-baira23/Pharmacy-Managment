@@ -1,7 +1,6 @@
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
-from django.contrib.auth.models import Group
 
 from rest_framework import serializers
 from djoser.serializers import UserCreatePasswordRetypeSerializer as UCPR
@@ -254,6 +253,68 @@ User = get_user_model()
 
 ## ########## ROLES ##########
 
+class ShiftSerializer(serializers.ModelSerializer):
+    days = serializers.SerializerMethodField("get_days")
+    class Meta:
+        model = Shift
+        fields = ['id','name','start_time','end_time','days']
+
+    def get_days(self,shift):
+        return [i.day.id for i in shift.days.all()]
+    
+
+class ShiftAddSerializer(serializers.ModelSerializer):
+    days = serializers.ListField(child=serializers.IntegerField(min_value=1,max_value=7),min_length=1,max_length=7,write_only=True)
+    class Meta:
+        model = Shift
+        fields = ['id','name','start_time','end_time','days']
+
+
+    def validate_days(self,days):
+        if len(days) != len(set(days)):
+            raise serializers.ValidationError("dublicate are not allowed")
+        return days
+
+
+    def validate(self, attrs):
+        start = attrs.get('start_time')
+        end = attrs.get('end_time')
+        if start > end:
+            raise serializers.ValidationError("end time must be after start time")
+        return super().validate(attrs)
+
+
+    def create(self, validated_data):
+        days = validated_data.pop('days')
+
+        with transaction.atomic():
+
+            instance = super().create(validated_data)
+            shift_days = [ShiftDay(shift=instance,day_id=id) for id in days]
+            ShiftDay.objects.bulk_create(shift_days)
+
+            return instance
+        
+    def update(self, instance, validated_data):
+        days = validated_data.pop('days') if validated_data.get('days') else None
+        deleted_days = []
+        with transaction.atomic():
+
+            instance = super().update(instance, validated_data)
+
+            for day in instance.days.all():
+                if not day.day.id in days:
+                    deleted_days.append(day.day.id)
+                else:
+                    days.remove(day.day.id)
+
+            instance.days.filter(day_id__in=deleted_days).delete()
+
+            shifts = [ShiftDay(shift=instance,day_id=id) for id in days]
+            ShiftDay.objects.bulk_create(shifts)
+
+            return instance
+
 class UserRoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserRole
@@ -285,15 +346,16 @@ class EmployeeListSerializer(serializers.ModelSerializer):
 
 class EmployeeSerializer(serializers.ModelSerializer):
     roles = UserRoleSerializer(many=True,read_only=True)
+    shift = ShiftSerializer(read_only=True)
     class Meta:
         model = User
-        fields = ['id','first_name', 'last_name', 'email', 'phone_number', 'salry', 'pharmacy','roles']
+        fields = ['id','first_name', 'last_name', 'email', 'phone_number', 'salry', 'pharmacy','shift','roles']
 
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
     roles = serializers.ListField(child=serializers.BooleanField(),min_length=4,max_length=4,write_only=True)
     class Meta:
         model = User
-        fields = ['first_name','last_name','phone_number','salry','roles']
+        fields = ['first_name','last_name','phone_number','salry','roles','shift']
 
     def validate_roles(self,roles):
         for i in roles:
@@ -303,29 +365,30 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         with transaction.atomic():
-            roles = validated_data.pop('roles')
-            instance = super().update(instance, validated_data)
+            roles = validated_data.get('roles')
 
-            pre_roles = ['saller','purcher','pharmacy_manager','manager']
-            in_roles = []
-            out_roles = []
+            if roles:
+                validated_data.pop('roles')
 
-            user_roles = instance.roles.all()
-            names = user_roles.values_list('role',flat=True)
-
-            for idx,i in enumerate(roles):
-                if i :
-                    if pre_roles[idx] not in names: 
-                        in_roles.append((UserRole(role_id=pre_roles[idx],user=instance)))
-                else:
-                    out_roles.append(pre_roles[idx])
-
-            print(in_roles)
-            print(out_roles)
+                pre_roles = ['saller','purcher','pharmacy_manager','manager']
+                in_roles = []
+                out_roles = []
     
-            instance.roles.filter(role__in=out_roles).delete()
+                user_roles = instance.roles.all()
+                names = user_roles.values_list('role',flat=True)
+    
+                for idx,i in enumerate(roles):
+                    if i :
+                        if pre_roles[idx] not in names: 
+                            in_roles.append((UserRole(role_id=pre_roles[idx],user=instance)))
+                    else:
+                        out_roles.append(pre_roles[idx])
+        
+                instance.roles.filter(role__in=out_roles).delete()
+    
+                UserRole.objects.bulk_create(in_roles)
 
-            UserRole.objects.bulk_create(in_roles)
+            instance = super().update(instance, validated_data)
 
             return instance
     
@@ -334,7 +397,7 @@ class EmployeeCreateSerializer(UCPR):
     roles = serializers.ListField(child=serializers.BooleanField(),min_length=4,max_length=4,write_only=True)
     class Meta:
         model = User
-        fields = UCPR.Meta.fields + ("roles",)
+        fields = UCPR.Meta.fields + ("roles","shift",)
 
     def validate_roles(self,roles):
         for i in roles:

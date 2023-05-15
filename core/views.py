@@ -6,6 +6,7 @@ from .serializers import *
 from .permissions import *
 
 class PharmacyViewSet(viewsets.ModelViewSet):
+    serializer_class = PharmacySerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -15,15 +16,10 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
     
     def get_permissions(self):
-        if self.request.method == 'GET':
+        if self.action == 'retrieve':
             return [permissions.IsAuthenticated()]
-        return [permissions.IsAuthenticated(),ManagmentPermission()]
+        return [permissions.IsAuthenticated(),GenralManagerPermission()]
 
-
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return PharmacyListSerializer
-        return PharmacySerializer
     
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -42,8 +38,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
 
 class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
-    permission_classes = [permissions.IsAuthenticated,ManagmentPermission]
-    http_method_names = ['get','put','delete','post']
+    permission_classes = [permissions.IsAuthenticated,ManagerPermission]
 
     def get_queryset(self):
         return User.objects.prefetch_related('roles').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
@@ -66,6 +61,16 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
         instance.save()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
     
+
+class ShiftViewSet(viewsets.ModelViewSet):
+
+    def get_queryset(self):
+        return Shift.objects.prefetch_related('days__day').all()
+    
+    def get_serializer_class(self):
+        if self.action in ['create','update','partial_update']:
+            return ShiftAddSerializer
+        return ShiftSerializer
 
 #class MedicineViewset(viewsets.ModelViewSet):
 #    

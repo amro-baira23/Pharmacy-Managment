@@ -4,6 +4,8 @@ from rest_framework_nested import routers
 router = routers.DefaultRouter()
 router.register('pharmacy',PharmacyViewSet,basename='pharmacy')
 
+router.register('shift',ShiftViewSet,basename='shift')
+
 employee_router = routers.NestedDefaultRouter(router,'pharmacy',lookup='pharmacy')
 employee_router.register('employee',PharmacyEmployeeViewSet,basename='pharmacy-employees')
 

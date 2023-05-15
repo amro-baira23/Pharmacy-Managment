@@ -35,10 +35,9 @@ from core.models import Pharmacy
 #            id = view.kwargs.get("pharmacy_pk") or view.kwargs.get("pk")
 #            pharmacy = Pharmacy.objects.filter(id=id)
 #            if pharmacy.exists():
-#                return request.user.is_owner or bool (request.user.pharmacy.id == int(id))
-            
+#                return request.user.is_owner or bool (request.user.pharmacy.id == int(id))     
 
-class ManagmentPermission(permissions.BasePermission):
+class ManagerPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         user_roles = request.user.roles.values_list('role',flat=True)
         if 'manager' in user_roles:
@@ -48,3 +47,10 @@ class ManagmentPermission(permissions.BasePermission):
             id = view.kwargs.get("pharmacy_pk") or view.kwargs.get("pk")
             if Pharmacy.objects.filter(id=id).exists():
                 return request.user.pharmacy.id == int(id)
+
+
+class GenralManagerPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user_roles = request.user.roles.values_list('role',flat=True)
+        if 'manager' in user_roles:
+            return True
