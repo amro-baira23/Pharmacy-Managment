@@ -38,7 +38,7 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
 
 class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
-    permission_classes = [permissions.IsAuthenticated,ManagerPermission]
+    permission_classes = [permissions.IsAuthenticated,ManagerOrPharmacyManagerPermission]
 
     def get_queryset(self):
         return User.objects.prefetch_related('roles').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
@@ -63,7 +63,8 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     
 
 class ShiftViewSet(viewsets.ModelViewSet):
-
+    permission_classes = [permissions.IsAuthenticated,AnyManagerPermission]
+    
     def get_queryset(self):
         return Shift.objects.prefetch_related('days__day').all()
     
@@ -71,6 +72,12 @@ class ShiftViewSet(viewsets.ModelViewSet):
         if self.action in ['create','update','partial_update']:
             return ShiftAddSerializer
         return ShiftSerializer
+    
+    def destroy(self, request, *args, **kwargs):
+        if User.objects.filter(shift=self.get_object()).count() > 0:
+            return response.Response({"error":"you must change all users shift to another one before deleting it"},status.HTTP_403_FORBIDDEN)
+        return super().destroy(request, *args, **kwargs)
+    
 
 #class MedicineViewset(viewsets.ModelViewSet):
 #    

@@ -279,7 +279,7 @@ class ShiftAddSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         start = attrs.get('start_time')
         end = attrs.get('end_time')
-        if start > end:
+        if start >= end:
             raise serializers.ValidationError("end time must be after start time")
         return super().validate(attrs)
 
@@ -333,7 +333,7 @@ class PharmacyListSerializer(serializers.ModelSerializer):
 class PharmacySerializer(serializers.ModelSerializer):
     class Meta:
         model = Pharmacy
-        fields = ['name','city','street','region','phone_number']
+        fields = ['id','name','city','street','region','phone_number']
 
     
 ## ########## EMPLOYEE ##########
