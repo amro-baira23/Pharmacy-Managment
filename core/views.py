@@ -41,8 +41,11 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated,ManagerOrPharmacyManagerPermission]
 
     def get_queryset(self):
-        return User.objects.prefetch_related('roles').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
-    
+        queryset = User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
+        if self.action == 'retrieve':
+            return queryset.select_related('shift').prefetch_related('roles','shift__days__day')
+        return queryset
+                   
     def get_serializer_class(self):
         if self.action == 'list':
             return EmployeeListSerializer
@@ -66,18 +69,34 @@ class ShiftViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated,AnyManagerPermission]
     
     def get_queryset(self):
-        return Shift.objects.prefetch_related('days__day').all()
-    
+        queryset = Shift.objects.all()
+
+        if self.action == 'retrieve':
+            return queryset.prefetch_related('days__day')
+        return queryset
+
     def get_serializer_class(self):
         if self.action in ['create','update','partial_update']:
             return ShiftAddSerializer
-        return ShiftSerializer
+        elif self.action == 'retrieve':
+            return ShiftSerializer
+        return ShiftListSerializer
     
     def destroy(self, request, *args, **kwargs):
         if User.objects.filter(shift=self.get_object()).count() > 0:
             return response.Response({"error":"you must change all users shift to another one before deleting it"},status.HTTP_403_FORBIDDEN)
         return super().destroy(request, *args, **kwargs)
     
+
+class CompanyViewSet(viewsets.ModelViewSet):
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    permission_classes = [permissions.IsAuthenticated,AnyManagerPermission]
+
+    def destroy(self, request, *args, **kwargs):
+        if Medicine.objects.filter(company=self.get_object()).count() > 0:
+            return response.Response({"error":"you must change all Medicines company to another one before deleting it"},status.HTTP_403_FORBIDDEN)
+        return super().destroy(request, *args, **kwargs)
 
 #class MedicineViewset(viewsets.ModelViewSet):
 #    

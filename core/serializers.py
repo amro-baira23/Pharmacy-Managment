@@ -10,6 +10,14 @@ from .models import *
 
 User = get_user_model()
 
+roles_map = {
+            'S':"saller",
+            'P':"purcher",
+            'PM':"pharmacy_manager",
+            'M':"manager",
+            }
+
+
 # ########## COMPANY ##########
 
 #class CompanySerializer(serializers.ModelSerializer):
@@ -253,6 +261,18 @@ User = get_user_model()
 
 ## ########## ROLES ##########
 
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ['id','name','phone_number']
+
+
+class ShiftListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shift
+        fields = ['id','name']
+
+
 class ShiftSerializer(serializers.ModelSerializer):
     days = serializers.SerializerMethodField("get_days")
     class Meta:
@@ -352,41 +372,26 @@ class EmployeeSerializer(serializers.ModelSerializer):
         fields = ['id','first_name', 'last_name', 'email', 'phone_number', 'salry', 'pharmacy','shift','roles']
 
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
-    roles = serializers.ListField(child=serializers.BooleanField(),min_length=4,max_length=4,write_only=True)
+    roles = serializers.ChoiceField(choices=ROLE_CHOICES,write_only=True)
+    shift = serializers.PrimaryKeyRelatedField(queryset=Shift.objects.all())
     class Meta:
         model = User
         fields = ['first_name','last_name','phone_number','salry','roles','shift']
 
-    def validate_roles(self,roles):
-        for i in roles:
-            if i:
-                return roles
-        raise serializers.ValidationError("atleast one value shoud be true")
 
     def update(self, instance, validated_data):
         with transaction.atomic():
-            roles = validated_data.get('roles')
+            role = validated_data.get('roles')
 
-            if roles:
+            if role:
                 validated_data.pop('roles')
 
-                pre_roles = ['saller','purcher','pharmacy_manager','manager']
-                in_roles = []
-                out_roles = []
-    
-                user_roles = instance.roles.all()
-                names = user_roles.values_list('role',flat=True)
-    
-                for idx,i in enumerate(roles):
-                    if i :
-                        if pre_roles[idx] not in names: 
-                            in_roles.append((UserRole(role_id=pre_roles[idx],user=instance)))
-                    else:
-                        out_roles.append(pre_roles[idx])
-        
-                instance.roles.filter(role__in=out_roles).delete()
-    
-                UserRole.objects.bulk_create(in_roles)
+                instance.roles.all().delete()
+
+                if role == 'PS':
+                    UserRole.objects.bulk_create([UserRole(user=instance,role_id=roles_map[i]) for i in role])            
+                else:
+                    UserRole.objects.create(user=instance,role_id=roles_map[role])
 
             instance = super().update(instance, validated_data)
 
@@ -394,19 +399,13 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
     
 
 class EmployeeCreateSerializer(UCPR):
-    roles = serializers.ListField(child=serializers.BooleanField(),min_length=4,max_length=4,write_only=True)
+    roles = serializers.ChoiceField(choices=ROLE_CHOICES,write_only=True)
+    shift = serializers.PrimaryKeyRelatedField(queryset=Shift.objects.all())
     class Meta:
         model = User
         fields = UCPR.Meta.fields + ("roles","shift",)
 
-    def validate_roles(self,roles):
-        for i in roles:
-            if i:
-                return roles
-        raise serializers.ValidationError("atleast one value shoud be true")
-
     def validate(self, attrs):
-        print(attrs)
         roles = attrs.get("roles")
         del attrs['roles']
         super().validate(attrs)
@@ -414,19 +413,18 @@ class EmployeeCreateSerializer(UCPR):
         return attrs
 
     def create(self, validated_data):
-        roles = validated_data.pop('roles')
+        role = validated_data.pop('roles')
         validated_data['pharmacy_id'] = self.context['pharmacy']
 
-        user = super().create(validated_data)
+        with transaction.atomic():
 
-        pre_roles = ['saller','purcher','pharmacy_manager','manager']
-        user_perms = []
+            user = super().create(validated_data)
 
-        for idx,i in enumerate(roles):
-            if i:
-               user_perms.append(UserRole(role_id=pre_roles[idx],user=user)) 
 
-        UserRole.objects.bulk_create(user_perms)
+            if role == 'PS':
+                    UserRole.objects.bulk_create([UserRole(user=user,role_id=roles_map[i]) for i in role])            
+            else:
+                    UserRole.objects.create(user=user,role_id=roles_map[role])
 
-        return user
-    
+            return user
+        

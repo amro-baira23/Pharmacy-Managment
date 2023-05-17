@@ -7,11 +7,17 @@ from .validators import validate_old_date
 
 User = settings.AUTH_USER_MODEL
 
-EMPLOYEE = 'E'
+SELLER = 'S'
+PURCHER = 'P'
+PURCHERANDSALLER = 'PS'
+PHARMACYMANAGER = 'PM'
 MANAGER = 'M'
 
 ROLE_CHOICES = [
-    (EMPLOYEE,'Employee'),
+    (SELLER,'Seller'),
+    (PURCHER,'Purcher'),
+    (PURCHERANDSALLER,'Purcher And Seller'),
+    (PHARMACYMANAGER,'PharmacyManager'),
     (MANAGER,'Manager'),
     ]
 
@@ -105,7 +111,7 @@ class Pharmacy(models.Model):
     
 
 class Company(models.Model):
-    name = models.CharField(max_length=50,primary_key=True)
+    name = models.CharField(max_length=50)
     phone_number = models.CharField(_("phone_number"),max_length=10,validators=[MinLengthValidator(7)],unique=True)
 
     def __str__(self) -> str:

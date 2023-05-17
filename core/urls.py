@@ -6,6 +6,8 @@ router.register('pharmacy',PharmacyViewSet,basename='pharmacy')
 
 router.register('shift',ShiftViewSet,basename='shift')
 
+router.register('company',CompanyViewSet,basename='company')
+
 employee_router = routers.NestedDefaultRouter(router,'pharmacy',lookup='pharmacy')
 employee_router.register('employee',PharmacyEmployeeViewSet,basename='pharmacy-employees')
 
