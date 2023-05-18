@@ -9,6 +9,7 @@ djangorestframework = "*"
 djoser = "*"
 django-debug-toolbar = "*"
 drf-nested-routers = "*"
+django-cors-headers = "*"
 
 [dev-packages]
 

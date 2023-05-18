@@ -27,10 +27,7 @@ SECRET_KEY = 'django-insecure-w@-i=-9$472w#2(c=v)d56&m^s8@r3hd(b7=x8!8e$h7mtkx46
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-
-    '192.168.1.107'
+    '*'
 ]
 
 
@@ -44,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'corsheaders',
     'rest_framework',
     'djoser',
     'debug_toolbar',
@@ -55,6 +53,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -161,6 +160,8 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1000),
     "TOKEN_OBTAIN_SERIALIZER": "custom.serializers.MyTokenObtain",
 }
+
+CORS_ORIGIN_ALLOW_ALL = True
 
 import mimetypes
 mimetypes.add_type("application/javascript", ".js", True)

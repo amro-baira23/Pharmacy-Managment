@@ -1,7 +1,6 @@
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
-from django.contrib.auth.models import Group
 
 from rest_framework import serializers
 from djoser.serializers import UserCreatePasswordRetypeSerializer as UCPR
@@ -10,105 +9,52 @@ from .models import *
 
 User = get_user_model()
 
+roles_map = {
+            'S':"saller",
+            'P':"purcher",
+            'PM':"pharmacy_manager",
+            'M':"manager",
+            }
+
+
 # ########## COMPANY ##########
 
-#class CompanySerializer(serializers.ModelSerializer):
-#    class Meta:
-#        model = Company
-#        fields = ['id','name']
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ['id','name','phone_number']
+
+
+    def validate_brand_name(self,name):
+        return name.capitalize()
+
 #
 ## ########## MEDICINE ##########
 #
-#class MedicineListSerializer(serializers.ModelSerializer):
-#    class Meta:
-#        model = Medicine
-#        fields = [
-#            'id',
-#            'brand_name',
-#            'barcode',
-#            'sale_price',
-#            'purchase_price',
-#            'type',
-#            'need_prescription',
-#            'company',
-#        ]
-#  
-#
-#class MedicineCreateSerializer(serializers.ModelSerializer):
-#    company = serializers.CharField(write_only=True,max_length=50)
-#    class Meta:
-#        model = Medicine
-#        fields = [
-#            'id',
-#            'company',
-#            'brand_name',
-#            'barcode',
-#            'sale_price',
-#            'purchase_price',
-#            'need_prescription',
-#            'type',
-#        ]
-#  
-#    def create(self, validated_data):
-#        with transaction.atomic():
-#            
-#            company , created = Company.objects.get_or_create(name=validated_data.pop('company'))
-#            validated_data['company'] = company
-#
-#            medicine , created = Medicine.unique_medicine.get_or_create(validated_data)
-#            if not created:
-#                raise serializers.ValidationError({'error':_('medicine with this data already exist')})
-#            return medicine
-#        
-#
-#class MedicineUpdateSerializer(serializers.ModelSerializer):
-#    company_name = serializers.CharField(max_length=50,write_only=True,required=False,allow_blank=True)
-#    class Meta:
-#        model = Medicine
-#        fields = [
-#            'brand_name',
-#            'barcode',
-#            'company_name',
-#            'type',
-#            'sale_price',
-#            'purchase_price',
-#            'need_prescription',
-#            'is_active'
-#        ]
-#
-#    def validate_brand_name(self,name):
-#        return name.capitalize()
-#    
-#    def validate_company_name(self,company_name):
-#        return company_name.capitalize()
-#
-#    def update(self, instance, validated_data):
-#        ph_id = self.context['pharmacy_pk']
-#        com_name = validated_data.get('company_name')
-#        company = instance.company if instance.company is not None and self.partial else None
-#        
-#
-#        validated_data['barcode'] = validated_data.get('barcode') or instance.barcode
-#        validated_data['brand_name'] = validated_data.get('brand_name') or instance.brand_name
-#        validated_data['type'] = validated_data.get('type') or instance.type
-#
-#
-#        with transaction.atomic():
-#
-#            if com_name is not None and com_name != '':
-#                company, created = Company.objects.get_or_create(pharmacy_id=ph_id,name=com_name)
-#
-#            try:
-#                medicine = Medicine.unique_medicine.get(ph_id,validated_data)
-#                if medicine != instance:
-#                    raise serializers.ValidationError({'error':_('cant update medicine , with same data already exist')})
-#            except Medicine.DoesNotExist:
-#                pass
-#            
-#            instance.company = company
-#            instance = super().update(instance, validated_data)
-#            return instance
+class MedicineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Medicine
+        fields = [
+            'company',
+            'brand_name',
+            'barcode',
+            'sale_price',
+            'purchase_price',
+            'need_prescription',
+            'min_quanity',
+            'type'
+        ]
 
+
+    def validate_brand_name(self,brand_name):
+        return brand_name.capitalize()
+
+
+class MedicineUpdateSerializer(MedicineSerializer):
+    class Meta(MedicineSerializer.Meta):
+        fields = MedicineSerializer.Meta.fields + ['is_active']
+  
+    
 ## ########## SALEITEM ##########
 #    
 #class SaleItemSerializer(serializers.ModelSerializer):
@@ -252,6 +198,74 @@ User = get_user_model()
 #    
 
 ## ########## ROLES ##########
+class ShiftListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shift
+        fields = ['id','name']
+
+
+class ShiftSerializer(serializers.ModelSerializer):
+    days = serializers.SerializerMethodField("get_days")
+    class Meta:
+        model = Shift
+        fields = ['id','name','start_time','end_time','days']
+
+    def get_days(self,shift):
+        return [i.day for i in shift.days.all()]
+    
+
+class ShiftAddSerializer(serializers.ModelSerializer):
+    days = serializers.ListField(child=serializers.IntegerField(min_value=1,max_value=7),min_length=1,max_length=7,write_only=True)
+    class Meta:
+        model = Shift
+        fields = ['id','name','start_time','end_time','days']
+
+
+    def validate_days(self,days):
+        if len(days) != len(set(days)):
+            raise serializers.ValidationError("dublicate are not allowed")
+        return days
+
+
+    def validate(self, attrs):
+        start = attrs.get('start_time')
+        end = attrs.get('end_time')
+        if start >= end:
+            raise serializers.ValidationError("end time must be after start time")
+        return super().validate(attrs)
+
+
+    def create(self, validated_data):
+        days = validated_data.pop('days')
+
+        with transaction.atomic():
+
+            instance = super().create(validated_data)
+            shift_days = [ShiftDay(shift=instance,day=i) for i in days]
+            ShiftDay.objects.bulk_create(shift_days)
+
+            return instance
+        
+    def update(self, instance, validated_data):
+        days = validated_data.pop('days') if validated_data.get('days') else None
+        deleted_days = []
+        with transaction.atomic():
+
+            instance = super().update(instance, validated_data)
+
+            if days:
+                for d in instance.days.all():
+                    if not d.day in days:
+                        deleted_days.append(d.day)
+                    else:
+                        days.remove(d.day)
+
+                instance.days.filter(day__in=deleted_days).delete()
+
+                shifts = [ShiftDay(shift=instance,day=i) for i in days]
+                ShiftDay.objects.bulk_create(shifts)
+
+            return instance
 
 class UserRoleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -274,7 +288,7 @@ class PharmacyListSerializer(serializers.ModelSerializer):
 class PharmacySerializer(serializers.ModelSerializer):
     class Meta:
         model = Pharmacy
-        fields = ['name','city','street','region','phone_number']
+        fields = ['id','name','city','street','region','phone_number']
 
     
 ## ########## EMPLOYEE ##########
@@ -287,65 +301,46 @@ class EmployeeListSerializer(serializers.ModelSerializer):
 
 class EmployeeSerializer(serializers.ModelSerializer):
     roles = UserRoleSerializer(many=True,read_only=True)
+    shift = ShiftSerializer(read_only=True)
     class Meta:
         model = User
-        fields = ['id','first_name', 'last_name', 'email', 'phone_number', 'salry', 'pharmacy','roles']
+        fields = ['id','first_name', 'last_name', 'email', 'phone_number', 'salry', 'pharmacy','shift','roles']
 
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
-    roles = serializers.ListField(child=serializers.BooleanField(),min_length=4,max_length=4,write_only=True)
+    roles = serializers.ChoiceField(choices=ROLE_CHOICES,write_only=True)
+    shift = serializers.PrimaryKeyRelatedField(queryset=Shift.objects.all())
     class Meta:
         model = User
-        fields = ['first_name','last_name','phone_number','salry','roles']
+        fields = ['first_name','last_name','phone_number','salry','roles','shift']
 
-    def validate_roles(self,roles):
-        for i in roles:
-            if i:
-                return roles
-        raise serializers.ValidationError("atleast one value shoud be true")
 
     def update(self, instance, validated_data):
         with transaction.atomic():
-            roles = validated_data.pop('roles')
-            instance = super().update(instance, validated_data)
+            role = validated_data.get('roles')
 
-            pre_roles = ['saller','purcher','pharmacy_manager','manager']
-            in_roles = []
-            out_roles = []
+            if role:
+                validated_data.pop('roles')
 
-            user_roles = instance.roles.all()
-            names = user_roles.values_list('role',flat=True)
+                instance.roles.all().delete()
 
-            for idx,i in enumerate(roles):
-                if i :
-                    if pre_roles[idx] not in names: 
-                        in_roles.append((UserRole(role_id=pre_roles[idx],user=instance)))
+                if role == 'PS':
+                    UserRole.objects.bulk_create([UserRole(user=instance,role_id=roles_map[i]) for i in role])            
                 else:
-                    out_roles.append(pre_roles[idx])
+                    UserRole.objects.create(user=instance,role_id=roles_map[role])
 
-            print(in_roles)
-            print(out_roles)
-    
-            instance.roles.filter(role__in=out_roles).delete()
-
-            UserRole.objects.bulk_create(in_roles)
+            instance = super().update(instance, validated_data)
 
             return instance
     
 
 class EmployeeCreateSerializer(UCPR):
-    roles = serializers.ListField(child=serializers.BooleanField(),min_length=4,max_length=4,write_only=True)
+    roles = serializers.ChoiceField(choices=ROLE_CHOICES,write_only=True)
+    shift = serializers.PrimaryKeyRelatedField(queryset=Shift.objects.all())
     class Meta:
         model = User
-        fields = UCPR.Meta.fields + ("roles",)
-
-    def validate_roles(self,roles):
-        for i in roles:
-            if i:
-                return roles
-        raise serializers.ValidationError("atleast one value shoud be true")
+        fields = UCPR.Meta.fields + ("roles","shift",)
 
     def validate(self, attrs):
-        print(attrs)
         roles = attrs.get("roles")
         del attrs['roles']
         super().validate(attrs)
@@ -353,19 +348,18 @@ class EmployeeCreateSerializer(UCPR):
         return attrs
 
     def create(self, validated_data):
-        roles = validated_data.pop('roles')
+        role = validated_data.pop('roles')
         validated_data['pharmacy_id'] = self.context['pharmacy']
 
-        user = super().create(validated_data)
+        with transaction.atomic():
 
-        pre_roles = ['saller','purcher','pharmacy_manager','manager']
-        user_perms = []
+            user = super().create(validated_data)
 
-        for idx,i in enumerate(roles):
-            if i:
-               user_perms.append(UserRole(role_id=pre_roles[idx],user=user)) 
 
-        UserRole.objects.bulk_create(user_perms)
+            if role == 'PS':
+                    UserRole.objects.bulk_create([UserRole(user=user,role_id=roles_map[i]) for i in role])            
+            else:
+                    UserRole.objects.create(user=user,role_id=roles_map[role])
 
-        return user
-    
+            return user
+        

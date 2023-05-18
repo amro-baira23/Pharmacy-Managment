@@ -6,6 +6,7 @@ from .serializers import *
 from .permissions import *
 
 class PharmacyViewSet(viewsets.ModelViewSet):
+    serializer_class = PharmacySerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -15,15 +16,10 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
     
     def get_permissions(self):
-        if self.request.method == 'GET':
+        if self.action == 'retrieve':
             return [permissions.IsAuthenticated()]
-        return [permissions.IsAuthenticated(),ManagmentPermission()]
+        return [permissions.IsAuthenticated(),GenralManagerPermission()]
 
-
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return PharmacyListSerializer
-        return PharmacySerializer
     
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -42,12 +38,14 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
 
 class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
-    permission_classes = [permissions.IsAuthenticated,ManagmentPermission]
-    http_method_names = ['get','put','delete','post']
+    permission_classes = [permissions.IsAuthenticated,ManagerOrPharmacyManagerPermission]
 
     def get_queryset(self):
-        return User.objects.prefetch_related('roles').filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
-    
+        queryset = User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
+        if self.action == 'retrieve':
+            return queryset.select_related('shift').prefetch_related('roles','shift__days__day')
+        return queryset
+                   
     def get_serializer_class(self):
         if self.action == 'list':
             return EmployeeListSerializer
@@ -67,32 +65,59 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
         return response.Response(status=status.HTTP_204_NO_CONTENT)
     
 
+class ShiftViewSet(viewsets.ModelViewSet):
+    queryset = Shift.objects.all()
+    permission_classes = [permissions.IsAuthenticated,ManagerPermission]
+    
+
+    def get_serializer_class(self):
+        if self.action in ['create','update','partial_update']:
+            return ShiftAddSerializer
+        elif self.action == 'retrieve':
+            return ShiftSerializer
+        return ShiftListSerializer
+    
+    def destroy(self, request, *args, **kwargs):
+        if User.objects.filter(shift=self.get_object()).count() > 0:
+            return response.Response({"error":"you must change all users shift to another one before deleting it"},status.HTTP_403_FORBIDDEN)
+        return super().destroy(request, *args, **kwargs)
+    
+
+class CompanyViewSet(viewsets.ModelViewSet):
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    permission_classes = [permissions.IsAuthenticated,ManagerPermission]
+
+    def destroy(self, request, *args, **kwargs):
+        company = self.get_object()
+        if Medicine.objects.filter(company=company).count() > 0:
+            return response.Response({"error":"you must change all Medicines company to another one before deleting it"},status.HTTP_403_FORBIDDEN)
+        company.delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
+
 class MedicineViewset(viewsets.ModelViewSet):
-   
-#    def get_permissions(self):
-#        if self.request.method == 'GET':
-#            return [IsMember()]
-#        return [EmployeePermission()]
-       
-   def get_queryset(self):
-       return Medicine.objects.all()
-   
-#    def get_serializer_class(self):
-#        if self.action == 'update' or self.action == 'partial_update':
-#            return MedicineUpdateSerializer
-#        if self.action == 'create':
-#            return MedicineCreateSerializer
-#        return MedicineListSerializer
+    queryset = Medicine.objects.all()
+    
+    
+    def get_serializer_class(self):
+        if self.request.method in ['PUT','PATCH']:
+            return MedicineUpdateSerializer
+        return MedicineSerializer
         
-   def destroy(self, request, *args, **kwargs):
-       instance = self.get_object()
-       if SaleItem.objects.filter(medicine=instance).exists():
-           return response.Response({'error':_('cant delete a medicine which sold once but you can archive it')})
-       instance.delete()
-       return response.Response(status=status.HTTP_204_NO_CONTENT)
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [ManagerPermission()]
+         
+    def destroy(self, request, *args, **kwargs):
+        medicine = self.get_object()
+        if SaleItem.objects.filter(medicine=medicine).exists():
+            return response.Response({'error':_('cant delete a medicine which sold once but you can archive it')})
+        medicine.delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
 
-
-# class PurchaseViewset(viewsets.ModelViewSet):
+#
+#class PurchaseViewset(viewsets.ModelViewSet):
 #    permission_classes = [PharmacyOwnerOrManager]
 #    serializer_class = PurchaseSerializer
 

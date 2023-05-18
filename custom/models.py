@@ -15,7 +15,8 @@ class User(AbstractUser):
     last_name = models.CharField(_("last name"), max_length=50)
     phone_number = models.CharField(_("phone_number"),max_length=10,validators=[MinLengthValidator(10)],unique=True)
     salry = models.PositiveIntegerField(_("salry"))
-    pharmacy = models.ForeignKey(Pharmacy,related_name='employees',null=True,blank=True,on_delete=models.CASCADE)
+    pharmacy = models.ForeignKey(Pharmacy,related_name='employees',null=True,blank=True,on_delete=models.PROTECT)
+    shift = models.ForeignKey(Shift,related_name='shift',null=True,blank=True,on_delete=models.PROTECT)
 
     objects = UserManager()
 

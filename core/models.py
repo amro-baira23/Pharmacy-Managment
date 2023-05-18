@@ -7,11 +7,17 @@ from .validators import validate_old_date
 
 User = settings.AUTH_USER_MODEL
 
-EMPLOYEE = 'E'
+SELLER = 'S'
+PURCHER = 'P'
+PURCHERANDSALLER = 'PS'
+PHARMACYMANAGER = 'PM'
 MANAGER = 'M'
 
 ROLE_CHOICES = [
-    (EMPLOYEE,'Employee'),
+    (SELLER,'Seller'),
+    (PURCHER,'Purcher'),
+    (PURCHERANDSALLER,'Purcher And Seller'),
+    (PHARMACYMANAGER,'PharmacyManager'),
     (MANAGER,'Manager'),
     ]
 
@@ -36,23 +42,14 @@ TYPE_CHOICES = [
 ]
 
 
-
-SATURDAY = 'SA'
-SUNDAY = 'SU'
-MONDAY = 'MO'
-TUESDAY = 'TU'
-WEDNESDAY = "WE"
-THURSDAY = 'TH'
-FRIDAY = "FR"
-
 DAY_CHOICES = [
-    (SATURDAY,'Saturday'),
-    (SUNDAY, 'Sunday'),
-    (MONDAY, 'Monday'),
-    (TUESDAY, 'Tuesday'),
-    (WEDNESDAY, 'Wednesday'),
-    (THURSDAY, 'Thursday'),
-    (FRIDAY, 'Friday'),
+    (1,'Saturday'),
+    (2, 'Sunday'),
+    (3, 'Monday'),
+    (4, 'Tuesday'),
+    (5, 'Wednesday'),
+    (6, 'Thursday'),
+    (7, 'Friday'),
 ]
 
 EXPIRY_NOT = "E"
@@ -66,7 +63,7 @@ NOTIFICATION_CHOICES = [
 ################## MANAGERS ######################
 
 class MedicineManager(models.Manager):
-    def get(self,ph_id,data):
+    def get(self,data):
         return Medicine.objects.get(
                                     type=data.get('type'),
                                     brand_name=data.get('brand_name'),
@@ -105,7 +102,7 @@ class Pharmacy(models.Model):
     
 
 class Company(models.Model):
-    name = models.CharField(max_length=50,primary_key=True)
+    name = models.CharField(max_length=50)
     phone_number = models.CharField(_("phone_number"),max_length=10,validators=[MinLengthValidator(7)],unique=True)
 
     def __str__(self) -> str:
@@ -123,7 +120,7 @@ class Medicine(models.Model):
     sale_price = models.PositiveIntegerField()
     purchase_price = models.PositiveIntegerField()
     need_prescription = models.BooleanField(default=0)
-    min_quanity = models.PositiveIntegerField()
+    min_quanity = models.PositiveIntegerField(default=10)
     is_active = models.BooleanField(default=1)
     type = models.CharField(max_length=3,choices=TYPE_CHOICES)
 
@@ -209,23 +206,28 @@ class UserRole(models.Model):
         unique_together = [['user','role']]
 
 
-class Day(models.Model):
-    name = models.CharField(choices=DAY_CHOICES,max_length=9,unique=True)
-
-
-class WorkTime(models.Model):
-    user = models.ForeignKey(User,related_name='work_times',on_delete=models.CASCADE)
-    pharmacy = models.ForeignKey(Pharmacy,on_delete=models.CASCADE)
-    day = models.ForeignKey(Day,on_delete=models.PROTECT)
+class Shift(models.Model):
+    name = models.CharField(max_length=255,unique=True)
     start_time = models.TimeField()
     end_time = models.TimeField()
 
-    class Meta:
-        unique_together = [['user','day']]
+    def __str__(self) -> str:
+        return self.name
 
+
+class ShiftDay(models.Model):
+    shift = models.ForeignKey(Shift,related_name='days',on_delete=models.CASCADE)
+    day = models.IntegerField(choices=DAY_CHOICES)
+
+    def __str__(self) -> str:
+        return self.shift.name + ' ' + DAY_CHOICES[self.day-1]
+
+    class Meta:
+        unique_together = [['shift','day']]
 
 class Notification(models.Model):
     medicine = models.ForeignKey(Medicine,related_name='notifications',on_delete=models.CASCADE)
+    pharmacy = models.ForeignKey(Pharmacy,related_name='ph_notifications',on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     body = models.CharField(max_length=255)
     type = models.CharField(choices=NOTIFICATION_CHOICES,max_length=1)
