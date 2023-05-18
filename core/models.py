@@ -129,7 +129,7 @@ class Medicine(models.Model):
     sale_price = models.PositiveIntegerField()
     purchase_price = models.PositiveIntegerField()
     need_prescription = models.BooleanField(default=0)
-    min_quanity = models.PositiveIntegerField()
+    min_quanity = models.PositiveIntegerField(default=10)
     is_active = models.BooleanField(default=1)
     type = models.CharField(max_length=3,choices=TYPE_CHOICES)
 
