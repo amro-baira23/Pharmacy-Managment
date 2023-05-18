@@ -45,7 +45,7 @@ class ManagerOrPharmacyManagerPermission(permissions.BasePermission):
             return 'manager' in user_roles or ('pharmacy_manager' in user_roles and request.user.pharmacy.id == int(id))
         return False
     
-class AnyManagerPermission(permissions.BasePermission):
+class ManagerPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         user_roles = request.user.roles.values_list('role',flat=True)
         return 'manager' in user_roles or 'pharmacy_manager' in user_roles 

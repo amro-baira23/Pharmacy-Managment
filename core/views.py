@@ -66,7 +66,7 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     
 
 class ShiftViewSet(viewsets.ModelViewSet):
-    permission_classes = [permissions.IsAuthenticated,AnyManagerPermission]
+    permission_classes = [permissions.IsAuthenticated,ManagerPermission]
     
     def get_queryset(self):
         queryset = Shift.objects.all()
@@ -91,36 +91,35 @@ class ShiftViewSet(viewsets.ModelViewSet):
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = Company.objects.all()
     serializer_class = CompanySerializer
-    permission_classes = [permissions.IsAuthenticated,AnyManagerPermission]
+    permission_classes = [permissions.IsAuthenticated,ManagerPermission]
 
     def destroy(self, request, *args, **kwargs):
-        if Medicine.objects.filter(company=self.get_object()).count() > 0:
+        company = self.get_object()
+        if Medicine.objects.filter(company=company).count() > 0:
             return response.Response({"error":"you must change all Medicines company to another one before deleting it"},status.HTTP_403_FORBIDDEN)
-        return super().destroy(request, *args, **kwargs)
+        company.delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
 
-#class MedicineViewset(viewsets.ModelViewSet):
-#    
-#    def get_permissions(self):
-#        if self.request.method == 'GET':
-#            return [IsMember()]
-#        return [EmployeePermission()]
-#        
-#    def get_queryset(self):
-#        return Medicine.objects.all()
-#    
-#    def get_serializer_class(self):
-#        if self.action == 'update' or self.action == 'partial_update':
-#            return MedicineUpdateSerializer
-#        if self.action == 'create':
-#            return MedicineCreateSerializer
-#        return MedicineListSerializer
-#         
-#    def destroy(self, request, *args, **kwargs):
-#        instance = self.get_object()
-#        if SaleItem.objects.filter(medicine=instance).exists():
-#            return response.Response({'error':_('cant delete a medicine which sold once but you can archive it')})
-#        instance.delete()
-#        return response.Response(status=status.HTTP_204_NO_CONTENT)
+class MedicineViewset(viewsets.ModelViewSet):
+    queryset = Medicine.objects.all()
+    
+    
+    def get_serializer_class(self):
+        if self.request.method in ['PUT','PATCH']:
+            return MedicineUpdateSerializer
+        return MedicineSerializer
+        
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [ManagerPermission()]
+         
+    def destroy(self, request, *args, **kwargs):
+        medicine = self.get_object()
+        if SaleItem.objects.filter(medicine=medicine).exists():
+            return response.Response({'error':_('cant delete a medicine which sold once but you can archive it')})
+        medicine.delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
 
 #
 #class PurchaseViewset(viewsets.ModelViewSet):

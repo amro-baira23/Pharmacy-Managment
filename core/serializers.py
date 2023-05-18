@@ -20,103 +20,42 @@ roles_map = {
 
 # ########## COMPANY ##########
 
-#class CompanySerializer(serializers.ModelSerializer):
-#    class Meta:
-#        model = Company
-#        fields = ['id','name']
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ['id','name','phone_number']
+
+
+    def validate_brand_name(self,name):
+        return name.capitalize()
+
 #
 ## ########## MEDICINE ##########
 #
-#class MedicineListSerializer(serializers.ModelSerializer):
-#    class Meta:
-#        model = Medicine
-#        fields = [
-#            'id',
-#            'brand_name',
-#            'barcode',
-#            'sale_price',
-#            'purchase_price',
-#            'type',
-#            'need_prescription',
-#            'company',
-#        ]
-#  
-#
-#class MedicineCreateSerializer(serializers.ModelSerializer):
-#    company = serializers.CharField(write_only=True,max_length=50)
-#    class Meta:
-#        model = Medicine
-#        fields = [
-#            'id',
-#            'company',
-#            'brand_name',
-#            'barcode',
-#            'sale_price',
-#            'purchase_price',
-#            'need_prescription',
-#            'type',
-#        ]
-#  
-#    def create(self, validated_data):
-#        with transaction.atomic():
-#            
-#            company , created = Company.objects.get_or_create(name=validated_data.pop('company'))
-#            validated_data['company'] = company
-#
-#            medicine , created = Medicine.unique_medicine.get_or_create(validated_data)
-#            if not created:
-#                raise serializers.ValidationError({'error':_('medicine with this data already exist')})
-#            return medicine
-#        
-#
-#class MedicineUpdateSerializer(serializers.ModelSerializer):
-#    company_name = serializers.CharField(max_length=50,write_only=True,required=False,allow_blank=True)
-#    class Meta:
-#        model = Medicine
-#        fields = [
-#            'brand_name',
-#            'barcode',
-#            'company_name',
-#            'type',
-#            'sale_price',
-#            'purchase_price',
-#            'need_prescription',
-#            'is_active'
-#        ]
-#
-#    def validate_brand_name(self,name):
-#        return name.capitalize()
-#    
-#    def validate_company_name(self,company_name):
-#        return company_name.capitalize()
-#
-#    def update(self, instance, validated_data):
-#        ph_id = self.context['pharmacy_pk']
-#        com_name = validated_data.get('company_name')
-#        company = instance.company if instance.company is not None and self.partial else None
-#        
-#
-#        validated_data['barcode'] = validated_data.get('barcode') or instance.barcode
-#        validated_data['brand_name'] = validated_data.get('brand_name') or instance.brand_name
-#        validated_data['type'] = validated_data.get('type') or instance.type
-#
-#
-#        with transaction.atomic():
-#
-#            if com_name is not None and com_name != '':
-#                company, created = Company.objects.get_or_create(pharmacy_id=ph_id,name=com_name)
-#
-#            try:
-#                medicine = Medicine.unique_medicine.get(ph_id,validated_data)
-#                if medicine != instance:
-#                    raise serializers.ValidationError({'error':_('cant update medicine , with same data already exist')})
-#            except Medicine.DoesNotExist:
-#                pass
-#            
-#            instance.company = company
-#            instance = super().update(instance, validated_data)
-#            return instance
+class MedicineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Medicine
+        fields = [
+            'company',
+            'brand_name',
+            'barcode',
+            'sale_price',
+            'purchase_price',
+            'need_prescription',
+            'min_quanity',
+            'type'
+        ]
 
+
+    def validate_brand_name(self,brand_name):
+        return brand_name.capitalize()
+
+
+class MedicineUpdateSerializer(MedicineSerializer):
+    class Meta(MedicineSerializer.Meta):
+        fields = MedicineSerializer.Meta.fields + ['is_active']
+  
+    
 ## ########## SALEITEM ##########
 #    
 #class SaleItemSerializer(serializers.ModelSerializer):
@@ -260,13 +199,6 @@ roles_map = {
 #    
 
 ## ########## ROLES ##########
-
-class CompanySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Company
-        fields = ['id','name','phone_number']
-
-
 class ShiftListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shift
