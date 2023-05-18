@@ -14,7 +14,7 @@ class Command(BaseCommand):
 
             shift = Shift.objects.create(name="main shift",start_time="12:00",end_time="18:00")
 
-            shift_days = [ShiftDay(shift=shift,day_id=i) for i in range(1,8)]
+            shift_days = [ShiftDay(shift=shift,day=i) for i in range(1,8)]
             
             ShiftDay.objects.bulk_create(shift_days)
             

@@ -212,7 +212,7 @@ class ShiftSerializer(serializers.ModelSerializer):
         fields = ['id','name','start_time','end_time','days']
 
     def get_days(self,shift):
-        return [i.day.id for i in shift.days.all()]
+        return [i.day for i in shift.days.all()]
     
 
 class ShiftAddSerializer(serializers.ModelSerializer):
@@ -242,7 +242,7 @@ class ShiftAddSerializer(serializers.ModelSerializer):
         with transaction.atomic():
 
             instance = super().create(validated_data)
-            shift_days = [ShiftDay(shift=instance,day_id=id) for id in days]
+            shift_days = [ShiftDay(shift=instance,day=i) for i in days]
             ShiftDay.objects.bulk_create(shift_days)
 
             return instance
@@ -254,16 +254,17 @@ class ShiftAddSerializer(serializers.ModelSerializer):
 
             instance = super().update(instance, validated_data)
 
-            for day in instance.days.all():
-                if not day.day.id in days:
-                    deleted_days.append(day.day.id)
-                else:
-                    days.remove(day.day.id)
+            if days:
+                for d in instance.days.all():
+                    if not d.day in days:
+                        deleted_days.append(d.day)
+                    else:
+                        days.remove(d.day)
 
-            instance.days.filter(day_id__in=deleted_days).delete()
+                instance.days.filter(day__in=deleted_days).delete()
 
-            shifts = [ShiftDay(shift=instance,day_id=id) for id in days]
-            ShiftDay.objects.bulk_create(shifts)
+                shifts = [ShiftDay(shift=instance,day=i) for i in days]
+                ShiftDay.objects.bulk_create(shifts)
 
             return instance
 

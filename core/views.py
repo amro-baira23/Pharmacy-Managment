@@ -66,14 +66,9 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     
 
 class ShiftViewSet(viewsets.ModelViewSet):
+    queryset = Shift.objects.all()
     permission_classes = [permissions.IsAuthenticated,ManagerPermission]
     
-    def get_queryset(self):
-        queryset = Shift.objects.all()
-
-        if self.action == 'retrieve':
-            return queryset.prefetch_related('days__day')
-        return queryset
 
     def get_serializer_class(self):
         if self.action in ['create','update','partial_update']:
