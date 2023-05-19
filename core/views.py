@@ -41,10 +41,7 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated,ManagerOrPharmacyManagerPermission]
 
     def get_queryset(self):
-        queryset = User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
-        if self.action == 'retrieve':
-            return queryset.select_related('shift').prefetch_related('roles','shift__days__day')
-        return queryset
+        return User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
                    
     def get_serializer_class(self):
         if self.action == 'list':

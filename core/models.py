@@ -231,3 +231,47 @@ class Notification(models.Model):
     title = models.CharField(max_length=255)
     body = models.CharField(max_length=255)
     type = models.CharField(choices=NOTIFICATION_CHOICES,max_length=1)
+
+
+class Disposal(models.Model):
+    pharmacy = models.ForeignKey(Pharmacy,related_name='disposals',on_delete=models.PROTECT)
+    user = models.ForeignKey(User,related_name='disposals',on_delete=models.PROTECT)
+    time_stamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return self.user.first_name
+
+    def time(self):
+        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
+
+
+class DisposedItem(models.Model):
+    medicine = models.ForeignKey(Medicine,related_name='disposed_items',on_delete=models.PROTECT)
+    disposal = models.ForeignKey(Disposal,related_name='items',on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField()
+    expiry_date = models.DateField()
+
+    class Meta:
+        unique_together = [['medicine','disposal']]
+
+
+class Returment(models.Model):
+    pharmacy = models.ForeignKey(Pharmacy,related_name='returments',on_delete=models.PROTECT)
+    user = models.ForeignKey(User,related_name='returments',on_delete=models.PROTECT)
+    time_stamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return self.user.first_name
+
+    def time(self):
+        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
+
+
+class ReturnedItem(models.Model):
+    medicine = models.ForeignKey(Medicine,related_name='returned_items',on_delete=models.PROTECT)
+    returment = models.ForeignKey(Returment,related_name='items',on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField()
+    expiry_date = models.DateField()
+
+    class Meta:
+        unique_together = [['medicine','returment']]

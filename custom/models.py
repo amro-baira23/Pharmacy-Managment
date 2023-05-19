@@ -29,3 +29,19 @@ class User(AbstractUser):
     def name(self):
         return self.first_name + ' ' + self.last_name
     
+    def get_roles(self):
+
+        roles = self.roles.all().values_list('role',flat=True)
+
+        if 'manager' in roles:
+            type = 'M'
+        elif 'pharmacy_manager' in roles:
+            type = 'PM'
+        elif 'saller' in roles and 'purcher' in roles:
+            type = 'PS'
+        elif 'saller' in roles:
+            type = 'S'
+        elif 'purcher' in roles:
+            type = 'P'
+        
+        return type
