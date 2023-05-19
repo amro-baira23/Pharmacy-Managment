@@ -7,7 +7,6 @@ from djoser.serializers import UserCreatePasswordRetypeSerializer as UCPR
 
 from .models import *
 
-
 User = get_user_model()
 
 roles_map = {
@@ -282,6 +281,9 @@ class PharmacyListSerializer(serializers.ModelSerializer):
         model = Pharmacy
         fields = ['id','name']
 
+
+    def to_representation(self, instance):
+        return super().to_representation(instance)
 
 class PharmacySerializer(serializers.ModelSerializer):
     class Meta:
