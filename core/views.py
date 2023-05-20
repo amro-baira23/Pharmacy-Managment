@@ -43,7 +43,7 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
         if self.action == 'retrieve':
-            return queryset.select_related('shift').prefetch_related('roles','shift__days__day')
+            return queryset.select_related('shift').prefetch_related('roles','shift__days')
         return queryset
                    
     def get_serializer_class(self):
@@ -116,78 +116,91 @@ class MedicineViewset(viewsets.ModelViewSet):
         medicine.delete()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
 
-#
-#class PurchaseViewset(viewsets.ModelViewSet):
-#    permission_classes = [PharmacyOwnerOrManager]
-#    serializer_class = PurchaseSerializer
 
-#    def get_queryset(self):
-#        return Purchase.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+class PurchaseViewset(viewsets.ModelViewSet):
+
+   def get_queryset(self):
+       return Purchase.objects.prefetch_related('items').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
    
-#    def get_serializer_class(self):
-#        if self.action == 'list':
-#            return PurchaseListSerializer
-#        elif self.action == 'create':
-#            return PurchaseCreateSerializer
-#        return PurchaseSerializer
+   def get_serializer_class(self):
+       if self.action == 'list':
+           return PurchaseListSerializer
+       elif self.action == 'create':
+           return PurchaseCreateSerializer
+       elif self.action == 'update':
+           return PurchaseUpdateSerializer
+       elif self.action == 'partial_update':
+           return PurchaseUpdateSerializer
+       return PurchaseSerializer
    
-#    def get_serializer_context(self):
-#        user = self.request.user
-#        name = user.first_name + ' ' + user.last_name
-#        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'name':name}
+   def get_serializer_context(self):
+       user = self.request.user
+       reciver = user.id
+       return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'reciver':reciver}
 
-#    def perform_create(self, serializer):
-#        items = self.request.data.get('items')
-
-#        for item in items:
-#            for idx2,item2 in enumerate(items):
-#                if item['medicine'] == item2['medicine'] and item is not item2:
-#                    item['quantity'] += item2['quantity']
-#                    items.pop(idx2)
-
-
-#        with transaction.atomic():
-#            purchase = serializer.save()
-#            new_context = {'purchase':purchase,'pharmacy_pk':self.kwargs['pharmacy_pk']}
-#            item_serializer = PurchaseItemSerializer(data=items,many=True,context=new_context)
-#            item_serializer.is_valid(raise_exception=True)
-#            item_serializer.save()
+   def perform_create(self, serializer):
+       items = self.request.data.get('items')
+       for item in items:
+           for idx2,item2 in enumerate(items):
+               if item['medicine'] == item2['medicine'] and item is not item2:
+                   item['quantity'] += item2['quantity']
+                   items.pop(idx2)
 
 
-#class SaleViewset(viewsets.ModelViewSet):
-#
-#    def get_queryset(self):
-#            if self.action == 'list':
-#                 return Sale.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
-#            return Sale.objects.prefetch_related('items').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
-#    
-#    def get_serializer_class(self):
-#        if self.action == 'list':
-#            return SaleListSerializer
-#        elif self.action == 'retrieve':
-#            return SaleSerizlizer
-#        return SaleCreateSerializer
-#    
-#    def get_serializer_context(self):
-#        user = self.request.user
-#        name = user.first_name + ' ' + user.last_name
-#        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'name':name}
-#    
+       with transaction.atomic():
+           purchase = serializer.save()
+           new_context = {'purchase':purchase,'pharmacy_pk':self.kwargs['pharmacy_pk']}
+           item_serializer = PurchaseItemSerializer(data=items,many=True,context=new_context)
+           if not item_serializer.is_valid(raise_exception=True):
+               raise serializers.ValidationError({'error':_('some items are invalid')})
+           item_serializer.save()
+
+
+class SaleViewset(viewsets.ModelViewSet):
+
+   def get_queryset(self):
+           if self.action == 'list':
+                return Sale.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+           return Sale.objects.prefetch_related('items').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+   
+   def get_serializer_class(self):
+       if self.action == 'list':
+           return SaleListSerializer
+       elif self.action == 'create':
+           return SaleCreateSerializer
+       elif self.action == 'update' :
+           return SaleUpadateSerializer
+       elif self.action == 'partial_update' :
+           return SaleUpadateSerializer
+       return SaleSerializer
+   
+   def get_serializer_context(self):
+       user = self.request.user
+       seller = user.id
+       return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'seller': seller}
+   
 #    def get_permissions(self):
 #        if self.action == 'delete':
 #            return [PharmacyOwner()]
 #        return [IsMember()]
-#
-#
-#    def perform_create(self, serializer):
-#        items = serializer.validated_data['items']
-#
-#        with transaction.atomic():
-#            sale = serializer.save()
-#            new_context = {'sale':sale,'pharmacy_pk':self.kwargs['pharmacy_pk']}
-#            item_serializer = SaleItemSerializer(data=items,many=True,context=new_context)
-#            if not item_serializer.is_valid():
-#                raise serializers.ValidationError({'error':_('some items are invalid')})
-#            item_serializer.save()
-#
-#
+
+
+   def perform_create(self, serializer):
+       items = serializer.validated_data['items']
+       print(items) 
+       for item in items:
+           for idx2,item2 in enumerate(items):
+               if item['medicine'] == item2['medicine'] and item is not item2:
+                   item['quantity'] += item2['quantity']
+                   items.pop(idx2)
+ 
+       
+       with transaction.atomic():
+           sale = serializer.save()
+           new_context = {'sale':sale,'pharmacy_pk':self.kwargs['pharmacy_pk']}
+           item_serializer = SaleItemSerializer(data=items,many=True,context=new_context)
+           if not item_serializer.is_valid():
+               raise serializers.ValidationError({'error':_('some items are invalid')})
+           item_serializer.save()
+
+

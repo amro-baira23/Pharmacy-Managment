@@ -1,12 +1,12 @@
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
-
+from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from djoser.serializers import UserCreatePasswordRetypeSerializer as UCPR
 
 from .models import *
-
+from datetime import date
 User = get_user_model()
 
 roles_map = {
@@ -56,146 +56,246 @@ class MedicineUpdateSerializer(MedicineSerializer):
   
     
 ## ########## SALEITEM ##########
-#    
-#class SaleItemSerializer(serializers.ModelSerializer):
-#    class Meta:
-#        model = SaleItem
-#        fields = [
-#            'id',
-#            'medicine',
-#            'quantity',
-#            'price',
-#        ]
-#
-#    def validate(self, attrs):
-#        medicine = attrs.get('medicine')
-#        if medicine.pharmacy.id != int(self.context['pharmacy_pk']):
-#            raise serializers.ValidationError(_('no medicine with such id for this pharmacy'))
-#        return super().validate(attrs)
-#
-#    
-#    def create(self, validated_data):
-#        medicine = validated_data['medicine']
-#        quantity = validated_data['quantity']
-#        with transaction.atomic():
-#            medicine.quantity -= quantity
-#            if medicine.quantity < 0:
-#                raise serializers.ValidationError({'error':_('not enough medicine %(name)s in enventory') % {'name':medicine.brand_name}})
-#            medicine.save()
-#            return SaleItem.objects.create(sale=self.context['sale'],**validated_data)
-#
+   
+class SaleItemSerializer(serializers.ModelSerializer):
+   class Meta:
+       model = SaleItem
+       fields = [
+           'id',
+           'medicine',
+           'quantity',
+           'price',
+           'expiry_date'
+       ]
+
+   def validate(self, attrs):
+       medicine = attrs.get('medicine')
+       if not Medicine.objects.filter(id=medicine.id).exists():
+           raise serializers.ValidationError(_('no medicine with such id for this pharmacy'))
+       return super().validate(attrs)
+   
+   def create(self, validated_data):
+           return SaleItem.objects.create(sale=self.context['sale'],**validated_data)
+
 ## ########## SALE ##########
-#
-#class SaleListSerializer(serializers.ModelSerializer):
-#    seller_name = serializers.CharField(read_only=True)
-#    class Meta:
-#        model = Sale
-#        fields = [
-#            'id',
-#            'seller_name',
-#            'time',
-#        ]
-#
-#
-#class SaleSerizlizer(serializers.ModelSerializer):
-#    items = SaleItemSerializer(many=True)
-#    class Meta:
-#        model = Sale
-#        fields = ['id','seller_name','items','time']
-#
-#
-#class SaleCreateSerializer(serializers.ModelSerializer):
-#    items = serializers.ListField(child=serializers.JSONField(),write_only=True)
-#    class Meta:
-#        model = Sale
-#        fields = ['items']
-#
-#
-#    def validate_items(self,items):
-#        if len(items) == 0:
-#            raise serializers.ValidationError(_('sale should have atleast one item'))
-#        
-#        for item in items:
-#            if type(item) is not dict:
-#                raise serializers.ValidationError(_('sale item should be dict'))
-#            
-#            if list(item.keys()) != ['medicine','quantity','price']:
-#                raise serializers.ValidationError(_('sale item should have have medicine quantity and price only'))
-#
-#        for item in items:
-#            for idx2,item2 in enumerate(items):
-#                if item['medicine'] == item2['medicine'] and item is not item2:
-#                    if item['price'] != item2['price']:
-#                        raise serializers.ValidationError(_('same item in the sale with diffrent price exist'))
-#                    item['quantity'] += item2['quantity']
-#                    items.pop(idx2)
-#  
-#        return items
-#
-#    def save(self, **kwargs):
-#        self.instance = Sale.objects.create(pharmacy_id=self.context['pharmacy_pk'],seller_name=self.context['name'])
-#        return self.instance
-#
+
+class SaleListSerializer(serializers.ModelSerializer):
+   seller= serializers.CharField(read_only=True)
+   class Meta:
+       model = Sale
+       fields = [
+           'id',
+           'seller',
+           'time',
+       ]
+
+
+class SaleSerializer(serializers.ModelSerializer):
+   items = SaleItemSerializer(many=True)
+   class Meta:
+       model = Sale
+       fields = ['id','seller','doctor_name','coustomer_name','items','time']
+
+
+class SaleCreateSerializer(serializers.ModelSerializer):
+   items = serializers.ListField(child=serializers.JSONField(),write_only=True)
+   class Meta:
+       model = Sale
+       fields = ['doctor_name','coustomer_name','items']
+
+
+   def validate_items(self,items):
+       if len(items) == 0:
+           raise serializers.ValidationError(_('sale should have atleast one item'))
+       
+       for item in items:
+           if type(item) is not dict:
+               raise serializers.ValidationError(_('sale item should be dict'))
+           
+           if list(item.keys()) != ['medicine','quantity','price','expiry_date']:
+               raise serializers.ValidationError(_('sale item should have have medicine quantity and price only'))
+
+       for item in items:
+           for idx2,item2 in enumerate(items):
+               if item['medicine'] == item2['medicine'] and item is not item2:
+                   if item['price'] != item2['price']:
+                       raise serializers.ValidationError(_('same item in the sale with diffrent price exist'))
+                   item['quantity'] += item2['quantity']
+                   items.pop(idx2)
+ 
+       return items
+
+   def save(self, **kwargs):
+       self.validated_data.pop('items')
+       data = self.validated_data
+       self.instance = Sale.objects.create(pharmacy_id=self.context['pharmacy_pk'],seller_id=self.context['seller'],**data)
+       return self.instance
+   
+class SaleUpadateSerializer(serializers.ModelSerializer):
+   items = serializers.ListField(child=serializers.JSONField(),write_only=True)
+   class Meta:
+       model = Sale
+       fields = ['doctor_name','coustomer_name','items']
+
+
+   def validate_items(self,items):
+       if len(items) == 0:
+           raise serializers.ValidationError(_('sale should have at least one item'))
+       
+       for item in items:
+           if type(item) is not dict:
+               raise serializers.ValidationError(_('sale item should be dict'))
+           
+           if  set(list(item.keys())) != set(['medicine','quantity','price','expiry_date']):
+               raise serializers.ValidationError(_('sale item should have have medicine quantity and price only'))
+
+       for item in items:
+           for idx2,item2 in enumerate(items):
+               if item['medicine'] == item2['medicine'] and item is not item2:
+                   if item['price'] != item2['price']:
+                       raise serializers.ValidationError(_('same item in the sale with diffrent price exist'))
+                   item['quantity'] += item2['quantity']
+                   items.pop(idx2)
+ 
+       return items
+
+
+   def update(self, instance, validated_data):
+       instance.doctor_name = validated_data.get('doctor_name',instance.doctor_name)
+       instance.coustomer_name = validated_data.get('coustomer_name',instance.coustomer_name)
+       items = validated_data.get('items')
+       item_serializer = SaleItemSerializer(data=items,many=True)
+       if not item_serializer.is_valid():
+           raise serializers.ValidationError("items are not all valid")
+       items = item_serializer.validated_data
+       with transaction.atomic():
+            item_arr = []
+            SaleItem.objects.filter(sale=instance).delete()
+            for item in items:
+                item_instance = SaleItem(**item,sale=instance)
+                item_arr.append(item_instance)
+            SaleItem.objects.bulk_create(item_arr)    
+            instance.save() 
+       return instance
+   
+
 ## ########## PURCHASEITEM ##########
-#
-#class PurchaseItemSerializer(serializers.ModelSerializer):
-#    class Meta:
-#        model = PurchaseItem
-#        fields = ['id','medicine','quantity','price']
-#
-#    def validate(self, attrs):
-#        medicine = attrs.get('medicine')
-#        if medicine.pharmacy.id != int(self.context['pharmacy_pk']):
-#            raise serializers.ValidationError(_('no medicine with such id for this pharmacy'))
-#        return super().validate(attrs)
-#    
-#    def create(self, validated_data):
-#        medicine = validated_data['medicine']
-#        quantity = validated_data['quantity']
-#        with transaction.atomic():
-#            medicine.quantity += quantity
-#            medicine.save()
-#            return PurchaseItem.objects.create(purchase=self.context['purchase'],**validated_data)
-#
-## ########## PURCHASE ##########
-#
-#class PurchaseListSerializer(serializers.ModelSerializer):
-#    class Meta:
-#        model = Purchase
-#        fields = [
-#            'id',
-#            'reciver_name',
-#            'time'
-#        ]
-#    
-#
-#class PurchaseSerializer(serializers.ModelSerializer):
-#    items = PurchaseItemSerializer(many=True)
-#    class Meta:
-#        model = Purchase
-#        fields = [
-#            'id',
-#            'reciver_name',
-#            'time',
-#            'items'
-#        ]
-#    
-#
-#class PurchaseCreateSerializer(serializers.ModelSerializer):
-#    items = PurchaseItemSerializer(many=True)
-#    class Meta:
-#        model = Purchase
-#        fields = ['items']
-#
-#    def validate_items(self,items):
-#        if len(items) == 0:
-#            raise serializers.ValidationError(_('sale should have atleast one item'))
-#        return items
-#
-#    def save(self, **kwargs):
-#        self.instance = Purchase.objects.create(reciver_name=self.context['name'],pharmacy_id=self.context['pharmacy_pk'])
-#        return self.instance
-#    
+
+class PurchaseItemSerializer(serializers.ModelSerializer):
+   class Meta:
+       model = PurchaseItem
+       fields = ['id','medicine','quantity','price','expiry_date']
+
+   def validate(self, attrs):
+       medicine = attrs.get('medicine')
+       if not Medicine.objects.filter(id=medicine.id).exists():
+           raise serializers.ValidationError(_('no medicine with such id for this pharmacy'))
+       return super().validate(attrs)
+   
+   def create(self, validated_data):
+       return PurchaseItem.objects.create(purchase=self.context['purchase'],**validated_data)
+
+# ########## PURCHASE ##########
+
+class PurchaseListSerializer(serializers.ModelSerializer):
+   reciver = serializers.CharField(read_only=True)
+   class Meta:
+       model = Purchase
+       fields = [
+           'id',
+           'reciver',
+           'time'
+       ]
+   
+
+class PurchaseSerializer(serializers.ModelSerializer):
+   items = PurchaseItemSerializer(many=True)
+   class Meta:
+       model = Purchase
+       fields = [
+           'id',
+           'reciver',
+           'time',
+           'items'
+       ]
+ 
+
+class PurchaseCreateSerializer(serializers.ModelSerializer):
+   items = serializers.ListField(child=serializers.JSONField(),write_only=True)
+   class Meta:
+       model = Purchase
+       fields = ['items']
+
+   def validate_items(self,items):
+       if len(items) == 0:
+           raise serializers.ValidationError(_('purchase should have at least one item'))
+     
+       for item in items:
+           if type(item) is not dict:
+               raise serializers.ValidationError(_('purchase item should be dict'))
+           
+           if  set(list(item.keys())) != set(['medicine','quantity','price','expiry_date']):
+               raise serializers.ValidationError(_('purchase item should have have medicine quantity and price only'))
+
+       for item in items:
+           for idx2,item2 in enumerate(items):
+               if item['medicine'] == item2['medicine'] and item is not item2:
+                   if item['price'] != item2['price']:
+                       raise serializers.ValidationError(_('same item in the purchase with diffrent price exist'))
+                   item['quantity'] += item2['quantity']
+                   items.pop(idx2)
+ 
+       return items
+   
+   def create(self, validated_data):
+        self.instance = Purchase.objects.create(reciver_id=self.context['reciver'],pharmacy_id=self.context['pharmacy_pk'])
+        return self.instance
+
+class PurchaseUpdateSerializer(serializers.ModelSerializer):
+   items = serializers.ListField(child=serializers.JSONField(),write_only=True)
+   class Meta:
+       model = Purchase
+       fields = ['items']
+
+   def validate_items(self,items):
+       if len(items) == 0:
+           raise serializers.ValidationError(_('purchase should have at least one item'))
+     
+       for item in items:
+           if type(item) is not dict:
+               raise serializers.ValidationError(_('purchase item should be dict'))
+           
+           if not set(list(item.keys())) <= set(['id','medicine','quantity','price','expiry_date']):
+               raise serializers.ValidationError(_('purchase item should have have medicine quantity and price only'))
+
+       for item in items:
+           for idx2,item2 in enumerate(items):
+               if item['medicine'] == item2['medicine'] and item is not item2:
+                   if item['price'] != item2['price']:
+                       raise serializers.ValidationError(_('same item in the purchase with diffrent price exist'))
+                   item['quantity'] += item2['quantity']
+                   items.pop(idx2)
+ 
+       return items
+   
+
+   def update(self, instance, validated_data):
+       items = validated_data.get('items')
+       item_serializer = PurchaseItemSerializer(data=items,many=True)
+       if not item_serializer.is_valid():
+           raise serializers.ValidationError("items are not all valid")
+       items = item_serializer.validated_data
+       with transaction.atomic():
+           item_arr = []
+           PurchaseItem.objects.filter(purchase=instance).delete()
+           for item in items:
+               item_instance = PurchaseItem(**item,purchase=instance)
+               item_arr.append(item_instance)
+           PurchaseItem.objects.bulk_create(item_arr)    
+           instance.save() 
+       return instance
+   
+
 
 ## ########## ROLES ##########
 class ShiftListSerializer(serializers.ModelSerializer):
