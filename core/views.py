@@ -41,10 +41,7 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated,ManagerOrPharmacyManagerPermission]
 
     def get_queryset(self):
-        queryset = User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
-        if self.action == 'retrieve':
-            return queryset.select_related('shift').prefetch_related('roles','shift__days')
-        return queryset
+        return User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
                    
     def get_serializer_class(self):
         if self.action == 'list':
@@ -127,9 +124,7 @@ class PurchaseViewset(viewsets.ModelViewSet):
            return PurchaseListSerializer
        elif self.action == 'create':
            return PurchaseCreateSerializer
-       elif self.action == 'update':
-           return PurchaseUpdateSerializer
-       elif self.action == 'partial_update':
+       elif self.action in ['update','partial_update']:
            return PurchaseUpdateSerializer
        return PurchaseSerializer
    
@@ -168,9 +163,7 @@ class SaleViewset(viewsets.ModelViewSet):
            return SaleListSerializer
        elif self.action == 'create':
            return SaleCreateSerializer
-       elif self.action == 'update' :
-           return SaleUpadateSerializer
-       elif self.action == 'partial_update' :
+       elif self.action == ['update','partial_update'] :
            return SaleUpadateSerializer
        return SaleSerializer
    

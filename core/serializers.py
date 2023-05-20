@@ -315,7 +315,7 @@ class ShiftSerializer(serializers.ModelSerializer):
     
 
 class ShiftAddSerializer(serializers.ModelSerializer):
-    days = serializers.ListField(child=serializers.IntegerField(min_value=1,max_value=7),min_length=1,max_length=7,write_only=True)
+    days = serializers.ListField(child=serializers.ChoiceField(choices=DAY_CHOICES),write_only=True)
     class Meta:
         model = Shift
         fields = ['id','name','start_time','end_time','days']
@@ -328,8 +328,8 @@ class ShiftAddSerializer(serializers.ModelSerializer):
 
 
     def validate(self, attrs):
-        start = attrs.get('start_time')
-        end = attrs.get('end_time')
+        start = attrs.get('start_time') or self.instance.start_time
+        end = attrs.get('end_time') or self.instance.end_time
         if start >= end:
             raise serializers.ValidationError("end time must be after start time")
         return super().validate(attrs)
@@ -400,8 +400,8 @@ class EmployeeListSerializer(serializers.ModelSerializer):
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
-    roles = UserRoleSerializer(many=True,read_only=True)
-    shift = ShiftSerializer(read_only=True)
+    roles = serializers.CharField(source="get_roles")
+    shift = ShiftListSerializer(read_only=True)
     class Meta:
         model = User
         fields = ['id','first_name', 'last_name', 'email', 'phone_number', 'salry', 'pharmacy','shift','roles']
