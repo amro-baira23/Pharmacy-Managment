@@ -132,6 +132,13 @@ class PurchaseViewset(viewsets.ModelViewSet):
        user = self.request.user
        reciver = user.id
        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'reciver':reciver}
+   
+   
+   def get_permissions(self):
+       if self.action == 'delete':
+           return [ManagerOrPharmacyManagerPermission()]
+       return [permissions.IsAuthenticated()]
+
 
    def perform_create(self, serializer):
        items = self.request.data.get('items')
@@ -172,10 +179,10 @@ class SaleViewset(viewsets.ModelViewSet):
        seller = user.id
        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'seller': seller}
    
-#    def get_permissions(self):
-#        if self.action == 'delete':
-#            return [PharmacyOwner()]
-#        return [IsMember()]
+   def get_permissions(self):
+       if self.action == 'delete':
+           return [ManagerOrPharmacyManagerPermission()]
+       return [permissions.IsAuthenticated()]
 
 
    def perform_create(self, serializer):
