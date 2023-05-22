@@ -1,5 +1,8 @@
-from rest_framework import viewsets,response,status
 from django.utils.translation import gettext as _
+from django.db.models import Sum,Subquery,OuterRef
+from django.db.models.functions import Coalesce
+
+from rest_framework import viewsets,response,status
 
 from .models import *
 from .serializers import *
@@ -41,7 +44,10 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated,ManagerOrPharmacyManagerPermission]
 
     def get_queryset(self):
-        return User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
+        queryset = User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
+        if self.action == 'retrieve':
+            queryset = queryset.select_related('shift')
+        return queryset
                    
     def get_serializer_class(self):
         if self.action == 'list':
@@ -93,8 +99,12 @@ class CompanyViewSet(viewsets.ModelViewSet):
         return response.Response(status=status.HTTP_204_NO_CONTENT)
 
 class MedicineViewset(viewsets.ModelViewSet):
-    queryset = Medicine.objects.all()
     
+    def get_queryset(self):
+        sales = SaleItem.objects.filter(medicine=OuterRef('pk'),sale__pharmacy_id=1).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        purchase = PurchaseItem.objects.filter(medicine=OuterRef('pk'),purchase__pharmacy_id=1).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        return Medicine.objects.annotate(amount=Coalesce(Subquery(purchase),0) - Coalesce(Subquery(sales),0))
+        
     
     def get_serializer_class(self):
         if self.request.method in ['PUT','PATCH']:
@@ -136,71 +146,48 @@ class PurchaseViewset(viewsets.ModelViewSet):
    
    def get_permissions(self):
        if self.action == 'delete':
-           return [ManagerOrPharmacyManagerPermission()]
+           return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
        return [permissions.IsAuthenticated()]
 
 
    def perform_create(self, serializer):
-       items = self.request.data.get('items')
-       for item in items:
-           for idx2,item2 in enumerate(items):
-               if item['medicine'] == item2['medicine'] and item is not item2:
-                   item['quantity'] += item2['quantity']
-                   items.pop(idx2)
+        items = serializer.validated_data['items']
 
+        print(items)
 
-       with transaction.atomic():
-           purchase = serializer.save()
-           new_context = {'purchase':purchase,'pharmacy_pk':self.kwargs['pharmacy_pk']}
-           item_serializer = PurchaseItemSerializer(data=items,many=True,context=new_context)
-           if not item_serializer.is_valid(raise_exception=True):
-               raise serializers.ValidationError({'error':_('some items are invalid')})
-           item_serializer.save()
+        with transaction.atomic():
+            purchase = serializer.save()
+            new_context = {'purchase':purchase,'pharmacy_pk':self.kwargs['pharmacy_pk']}
+            item_serializer = PurchaseItemSerializer(data=items,many=True,context=new_context)
+            if not item_serializer.is_valid():
+                raise serializers.ValidationError({'error':_('some items are invalid')})
+            item_serializer.save()
 
 
 class SaleViewset(viewsets.ModelViewSet):
 
-   def get_queryset(self):
-           if self.action == 'list':
-                return Sale.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
-           return Sale.objects.prefetch_related('items').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
-   
-   def get_serializer_class(self):
-       if self.action == 'list':
-           return SaleListSerializer
-       elif self.action == 'create':
-           return SaleCreateSerializer
-       elif self.action == ['update','partial_update'] :
-           return SaleUpadateSerializer
-       return SaleSerializer
-   
-   def get_serializer_context(self):
-       user = self.request.user
-       seller = user.id
-       return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'seller': seller}
-   
-   def get_permissions(self):
-       if self.action == 'delete':
-           return [ManagerOrPharmacyManagerPermission()]
-       return [permissions.IsAuthenticated()]
-
-
-   def perform_create(self, serializer):
-       items = serializer.validated_data['items']
-       print(items) 
-       for item in items:
-           for idx2,item2 in enumerate(items):
-               if item['medicine'] == item2['medicine'] and item is not item2:
-                   item['quantity'] += item2['quantity']
-                   items.pop(idx2)
- 
-       
-       with transaction.atomic():
-           sale = serializer.save()
-           new_context = {'sale':sale,'pharmacy_pk':self.kwargs['pharmacy_pk']}
-           item_serializer = SaleItemSerializer(data=items,many=True,context=new_context)
-           if not item_serializer.is_valid():
-               raise serializers.ValidationError({'error':_('some items are invalid')})
-           item_serializer.save()
+    def get_queryset(self):
+            queryset = Sale.objects.prefetch_related('seller').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+            if self.action == 'retrieve':
+                queryset = queryset.prefetch_related('items')
+            return queryset
+    
+    def get_serializer_class(self):
+        print(self.action)
+        if self.action == 'list':
+            return SaleListSerializer
+        elif self.action == 'retrieve':
+            return SaleSerializer
+        return SaleCreateSerializer
+    
+    def get_serializer_context(self):
+        user = self.request.user
+        seller = user.id
+        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'seller': seller}
+    
+    def get_permissions(self):
+        if self.action == 'delete':
+            return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
+        return [permissions.IsAuthenticated()]
 
 
