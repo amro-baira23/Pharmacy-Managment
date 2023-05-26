@@ -88,11 +88,14 @@ msgstr "بعض العناصر غير صالحة"
 msgid "sale item should be dict"
 msgstr "على العنصر المباع أن يكون قاموس"
 
-msgid "sale item should have have medicine quantity and price only"
-msgstr "على العنصر المباع أن يحوي سعر وكمية ودواء محدد"
+msgid "item should have have medicine quantity expiry-date and price only"
+msgstr "على العنصر المباع أن يحوي سعر وكمية وتاريخ صلاحية ودواء محدد"
 
-msgid "same item in the sale with diffrent price exist"
-msgstr "يوجد دواء مكرر بسعر مختلف ضمن الطلب"
+msgid "item should have have medicine quantity and price only"
+msgstr "على العنصر أن يحوي سعر وكمية ودواء محدد"
+
+msgid "same item with diffrent price or expiry_date exist"
+msgstr "يوجد دواء مكرر بسعر او بتاريح صلاحية مختلف ضمن الطلب"
 
 msgid "salry"
 msgstr "الراتب"

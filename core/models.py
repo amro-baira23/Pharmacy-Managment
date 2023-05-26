@@ -249,6 +249,7 @@ class DisposedItem(models.Model):
     medicine = models.ForeignKey(Medicine,related_name='disposed_items',on_delete=models.PROTECT)
     disposal = models.ForeignKey(Disposal,related_name='items',on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
+    price = models.PositiveIntegerField()
     expiry_date = models.DateField()
 
     class Meta:
@@ -271,6 +272,7 @@ class ReturnedItem(models.Model):
     medicine = models.ForeignKey(Medicine,related_name='returned_items',on_delete=models.PROTECT)
     returment = models.ForeignKey(Returment,related_name='items',on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
+    price = models.PositiveIntegerField()
     expiry_date = models.DateField()
 
     class Meta:

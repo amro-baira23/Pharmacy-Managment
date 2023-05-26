@@ -72,19 +72,18 @@ class ShiftViewSet(viewsets.ModelViewSet):
     queryset = Shift.objects.all()
     permission_classes = [permissions.IsAuthenticated,ManagerPermission]
     
-
     def get_serializer_class(self):
-        if self.action in ['create','update','partial_update']:
-            return ShiftAddSerializer
+        if self.action == 'list':
+            return ShiftListSerializer
         elif self.action == 'retrieve':
             return ShiftSerializer
-        return ShiftListSerializer
+        return ShiftAddSerializer
     
     def destroy(self, request, *args, **kwargs):
         if User.objects.filter(shift=self.get_object()).count() > 0:
             return response.Response({"error":"you must change all users shift to another one before deleting it"},status.HTTP_403_FORBIDDEN)
         return super().destroy(request, *args, **kwargs)
-    
+        
 
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = Company.objects.all()
@@ -98,7 +97,9 @@ class CompanyViewSet(viewsets.ModelViewSet):
         company.delete()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
 
+
 class MedicineViewset(viewsets.ModelViewSet):
+
     
     def get_queryset(self):
         sales = SaleItem.objects.filter(medicine=OuterRef('pk'),sale__pharmacy_id=1).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
@@ -130,39 +131,23 @@ class PurchaseViewset(viewsets.ModelViewSet):
        return Purchase.objects.prefetch_related('items').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
    
    def get_serializer_class(self):
-       if self.action == 'list':
-           return PurchaseListSerializer
-       elif self.action == 'create':
-           return PurchaseCreateSerializer
-       elif self.action in ['update','partial_update']:
-           return PurchaseUpdateSerializer
-       return PurchaseSerializer
-   
+        if self.action == 'list':
+            return PurchaseListSerializer
+        elif self.action == 'retrieve':
+            return PurchaseSerializer
+        return PurchaseAddSerializer
+
    def get_serializer_context(self):
        user = self.request.user
        reciver = user.id
        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'reciver':reciver}
    
-   
    def get_permissions(self):
        if self.action == 'delete':
            return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
        return [permissions.IsAuthenticated()]
-
-
-   def perform_create(self, serializer):
-        items = serializer.validated_data['items']
-
-        print(items)
-
-        with transaction.atomic():
-            purchase = serializer.save()
-            new_context = {'purchase':purchase,'pharmacy_pk':self.kwargs['pharmacy_pk']}
-            item_serializer = PurchaseItemSerializer(data=items,many=True,context=new_context)
-            if not item_serializer.is_valid():
-                raise serializers.ValidationError({'error':_('some items are invalid')})
-            item_serializer.save()
-
+   
+ 
 
 class SaleViewset(viewsets.ModelViewSet):
 
@@ -173,12 +158,11 @@ class SaleViewset(viewsets.ModelViewSet):
             return queryset
     
     def get_serializer_class(self):
-        print(self.action)
         if self.action == 'list':
             return SaleListSerializer
         elif self.action == 'retrieve':
             return SaleSerializer
-        return SaleCreateSerializer
+        return SaleAddSerializer
     
     def get_serializer_context(self):
         user = self.request.user
@@ -189,5 +173,4 @@ class SaleViewset(viewsets.ModelViewSet):
         if self.action == 'delete':
             return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
         return [permissions.IsAuthenticated()]
-
-
+    

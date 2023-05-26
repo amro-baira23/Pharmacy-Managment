@@ -10,6 +10,7 @@ djoser = "*"
 django-debug-toolbar = "*"
 drf-nested-routers = "*"
 django-cors-headers = "*"
+mysqlclient = "*"
 
 [dev-packages]
 
