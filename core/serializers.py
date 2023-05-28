@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
-from django.db.models import Sum,Subquery,OuterRef
+from django.db.models import Sum,Subquery,OuterRef,Q
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 from djoser.serializers import UserCreatePasswordRetypeSerializer as UCPR
@@ -66,22 +66,32 @@ class SaleItemListSerializer(serializers.ListSerializer):
         sale = self.context['sale']
         pharmacy_id = self.context['pharmacy_pk']
 
+        fil = Q()
+        ids = []
+
+        items = []
+        
         for item in validated_data:
-                
-                medicine = item['medicine']
-                expiry_date = item['expiry_date']
+            items.append(SaleItem(sale=sale,**item)) 
+            ids.append(item['medicine'].id)
+            fil |= Q(expiry_date=item["expiry_date"],medicine_id=item["medicine"])
 
-                sales = SaleItem.objects.filter(medicine=OuterRef('pk'),sale__pharmacy_id=pharmacy_id,expiry_date=expiry_date).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-                purchase = PurchaseItem.objects.filter(medicine=OuterRef('pk'),purchase__pharmacy_id=pharmacy_id,expiry_date=expiry_date).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-                amount = Medicine.objects.annotate(amount=Coalesce(Subquery(purchase),None) - Coalesce(Subquery(sales),0)).values('amount').get(id=medicine.id)['amount']
-            
-                if amount and amount - item['quantity'] >= 0:
-                    if medicine.min_quanity > amount - item['quantity'] >= 0:
-                        print('smaller')
-                else:
-                    raise serializers.ValidationError(f"There is no purchase for medicine {medicine} in pharmacy {pharmacy_id} with this date or not amount")
+        purchase = PurchaseItem.objects.filter(purchase__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        amounts = list(Medicine.objects.filter(id__in=ids).annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)).values_list('amount','id'))
 
-        items = [SaleItem(sale=sale,**item) for item in validated_data]
+
+        for set_item in amounts:
+            set_id = set_item[1]
+            for item in validated_data:
+                if item["medicine"].id == set_id:
+                    if set_item[0] - item['quantity'] >= 0:
+                       if item['medicine'].min_quanity > set_item[0] - item['quantity']:
+                           print('smaller')
+                    else:
+                        raise serializers.ValidationError({'error':"There is no purchase for medicine in pharmacy with this date or not amount"})
+                    break 
+
         return SaleItem.objects.bulk_create(items)
     
 
@@ -252,29 +262,27 @@ class PurchaseAddSerializer(serializers.ModelSerializer):
         old_items = instance.items.select_related('medicine').all()
         pharmacy_id = self.context['pharmacy_pk']
         new_context = {'purchase':self.instance}
-        
         if items:
-            
-            for item in old_items:
-                expiry_date = item.expiry_date
-                medicine = item.medicine
-                
-                sales = SaleItem.objects.filter(medicine=OuterRef('pk'),sale__pharmacy_id=pharmacy_id,expiry_date=expiry_date) \
-                                .values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-                
-                purchase = PurchaseItem.objects.filter(medicine=OuterRef('pk'),purchase__pharmacy_id=pharmacy_id,expiry_date=expiry_date) \
-                                .exclude(purchase=instance).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-               
-                amount = Medicine.objects.annotate(amount=Coalesce(Subquery(purchase),0) - Coalesce(Subquery(sales),0)) \
-                                .values('amount').get(id=medicine.id)['amount']
 
-                for item2 in items:
-                    if item2['medicine'] == medicine.id:
-                        amount += item2['quantity']
+            fil = Q()
+            old_dict = {}
+
+            for item in old_items:
+                old_dict[item.medicine.id] = item.expiry_date
+                fil |= Q(expiry_date=item.expiry_date,medicine_id=item.medicine.id)
+    
+            purchase = PurchaseItem.objects.exclude(purchase=instance).filter(purchase__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+            sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+            amounts = list(Medicine.objects.filter(id__in=list(old_dict.keys())).order_by().annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)).values_list('amount','id'))
+
+            for set_item in amounts:
+                med_id = set_item[1]
+                for item in items:
+                    if item["medicine"] == med_id and item['expiry_date'] == old_dict[med_id].strftime("%Y-%m-%d"):
+                        res = set_item[0] + item['quantity']
+                        if 0 > res:
+                            raise serializers.ValidationError({'error':'cant make this change some total amount will become negative'})
                         break
-                
-                if 0 > amount:
-                    raise serializers.ValidationError({'error':'cant make this change some total amount will become negative'})
 
             item_serializer = PurchaseItemSerializer(data=items,many=True,context=new_context)
 

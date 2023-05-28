@@ -128,7 +128,10 @@ class MedicineViewset(viewsets.ModelViewSet):
 class PurchaseViewset(viewsets.ModelViewSet):
 
    def get_queryset(self):
-       return Purchase.objects.prefetch_related('items').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+        queryset = Purchase.objects.prefetch_related('reciver').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+        if self.action == 'retrieve':
+            queryset = queryset.prefetch_related('items')
+        return queryset
    
    def get_serializer_class(self):
         if self.action == 'list':
@@ -147,7 +150,7 @@ class PurchaseViewset(viewsets.ModelViewSet):
            return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
        return [permissions.IsAuthenticated()]
    
- 
+      
 
 class SaleViewset(viewsets.ModelViewSet):
 
