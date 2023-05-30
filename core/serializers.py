@@ -9,54 +9,187 @@ from djoser.serializers import UserCreatePasswordRetypeSerializer as UCPR
 from .models import *
 User = get_user_model()
 
-roles_map = {
-            'S':"saller",
-            'P':"purcher",
-            'PM':"pharmacy_manager",
-            'M':"manager",
-            }
+def set_up_items_ids_filter(instance,data,type):
+    fil = Q()
+    ids = []
+    items = []
+    
+    match type:
+        case 1:
+            for item in data:
+                items.append(DisposedItem(disposal=instance,**item)) 
+                ids.append(item['medicine'].id)
+                fil |= Q(expiry_date=item["expiry_date"],medicine_id=item["medicine"])
+
+        case 2:
+            for item in data:
+                items.append(SaleItem(sale=instance,**item)) 
+                ids.append(item['medicine'].id)
+                fil |= Q(expiry_date=item["expiry_date"],medicine_id=item["medicine"])
+    
+    return items,ids,fil
 
 
-# ########## COMPANY ##########
+def get_amounts(ids,pharmacy_id,fil):
+    purchase = PurchaseItem.objects.filter(purchase__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+    sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+    dispose = DisposedItem.objects.filter(disposal__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+    amounts = list(Medicine.objects.filter(id__in=ids).annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)).values_list('amount','id'))
 
-class CompanySerializer(serializers.ModelSerializer):
+    return amounts
+
+
+def purchase_exclude_amounts(instance,items,pharmacy_id,flat=False):
+
+    fil = Q()
+    old_dict = {}
+    for item in items:
+        old_dict[item.medicine.id] = item.expiry_date.strftime("%Y-%m-%d")
+        fil |= Q(expiry_date=item.expiry_date,medicine_id=item.medicine.id)
+    
+    purchase = PurchaseItem.objects.exclude(purchase=instance).filter(purchase__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+    sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+    dispose = DisposedItem.objects.filter(disposal__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+    if flat:
+        value = 'amount',
+    else:
+        value = 'amount','id'
+
+    amounts = list(Medicine.objects.filter(id__in=list(old_dict.keys())).order_by().annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)).values_list(*value,flat=flat))
+
+    return old_dict,amounts
+
+
+def check_amounts(amounts,items):
+    for set_item in amounts:
+            set_id = set_item[1]
+            for item in items:
+                if item["medicine"].id == set_id:
+                    if set_item[0] - item['quantity'] >= 0:
+                       if item['medicine'].min_quanity > set_item[0] - item['quantity']:
+                           print('smaller')
+                    else:
+                        raise serializers.ValidationError({'error':"There is no purchase for medicine in pharmacy with this date or not amount"})
+                    break
+
+
+def preper_items(items):
+    seen_items = {}
+
+    for item in items:
+        if set(item.keys()) != {'medicine', 'quantity', 'price', 'expiry_date'}:
+            raise serializers.ValidationError(_('item should have have medicine quantity and price only'))
+        if 0 >= item['quantity']:
+            raise serializers.ValidationError('quantity should be gretter than 0')
+        if 0 >= item['price']:
+            raise serializers.ValidationError('price should be gretter than 0')
+        
+        key = (item['medicine'])
+
+        if key in seen_items:
+            existing_item = seen_items[key]
+            
+            if existing_item['price'] != item['price'] or existing_item['expiry_date'] != item['expiry_date']:
+                raise serializers.ValidationError(_('same item with diffrent price exist or expiry_date exist'))
+            existing_item['quantity'] += item['quantity']
+
+        else:
+            seen_items[key] = item
+
+    items.clear()
+    items.extend(seen_items.values())
+    return items
+
+
+def create_items(serializer,items,context):
+    item_serializer = serializer(data=items,many=True,context=context)
+    if not item_serializer.is_valid():
+        raise serializers.ValidationError({'error':_('some items are invalid')})
+    item_serializer.save()
+
+
+def update_items(instance,serializer,items,context):
+    if items:
+        item_serializer = serializer(data=items,many=True,context=context)
+        with transaction.atomic():
+            instance.items.all().delete()
+            if not item_serializer.is_valid():
+                raise serializers.ValidationError({'error':_('some items are invalid')})
+            item_serializer.save()
+      
+## ########## DISPOSEDITEM ##########
+
+
+class DisposedItemListSerializer(serializers.ListSerializer):
+    def create(self, validated_data):
+        disposal = self.context['disposal']
+        pharmacy_id = self.context['pharmacy_pk']
+
+        items,ids,fil = set_up_items_ids_filter(disposal,validated_data,1)
+
+        amounts = get_amounts(ids,pharmacy_id,fil)
+
+        check_amounts(amounts,validated_data)
+
+        return DisposedItem.objects.bulk_create(items)
+    
+
+class DisposedItemSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Company
-        fields = ['id','name','phone_number']
+        model = DisposedItem
+        fields = ['id','medicine','quantity','price','expiry_date']
+        list_serializer_class = DisposedItemListSerializer
 
 
-    def validate_name(self,name):
-        return name.capitalize()
+## ########## DISPOSE ##########
 
-#
-## ########## MEDICINE ##########
-#
 
-class MedicineSerializer(serializers.ModelSerializer):
-    amount = serializers.IntegerField(read_only=True)
+class DisposalListSerializer(serializers.ModelSerializer):
+   user = serializers.StringRelatedField()
+   class Meta:
+       model = Disposal
+       fields = ['id','user','time']
+
+
+class DisposalSerializer(serializers.ModelSerializer):
+    items = DisposedItemSerializer(many=True)
+    user = serializers.StringRelatedField()
     class Meta:
-        model = Medicine
-        fields = [
-            'id',
-            'company',
-            'brand_name',
-            'barcode',
-            'sale_price',
-            'purchase_price',
-            'need_prescription',
-            'min_quanity',
-            'type',
-            'amount',
-        ]
-
-    def validate_brand_name(self,brand_name):
-        return brand_name.capitalize()
+           model = Disposal
+           fields = ['id','user','items','time']
 
 
-class MedicineUpdateSerializer(MedicineSerializer):
-    class Meta(MedicineSerializer.Meta):
-        fields = MedicineSerializer.Meta.fields + ['is_active']
-  
+class DisposalAddSerializer(serializers.ModelSerializer):
+    items = serializers.ListField(child=serializers.DictField(),write_only=True,min_length=1)
+    class Meta:
+       model = Disposal
+       fields = ['items']
+
+    def validate_items(self,items):     
+       return preper_items(items)
+    
+    def create(self, validated_data):
+        items = validated_data.pop('items')
+        pharmacy_id = self.context['pharmacy_pk']
+        user_id = self.context['user']
+
+        with transaction.atomic():
+            self.instance = Disposal.objects.create(pharmacy_id=pharmacy_id,user_id=user_id)
+            new_context = {'disposal':self.instance,'pharmacy_pk':pharmacy_id}
+            
+            create_items(DisposedItemSerializer,items,new_context)
+
+        return self.instance
+
+    def update(self, instance, validated_data):
+        items = validated_data.get('items')
+
+        new_context = {'disposal':instance,'pharmacy_pk':self.context['pharmacy_pk']}
+
+        update_items(instance,DisposedItemSerializer,items,new_context)
+         
+        return instance
+   
     
 ## ########## SALEITEM ##########
    
@@ -66,31 +199,11 @@ class SaleItemListSerializer(serializers.ListSerializer):
         sale = self.context['sale']
         pharmacy_id = self.context['pharmacy_pk']
 
-        fil = Q()
-        ids = []
+        items,ids,fil = set_up_items_ids_filter(sale,validated_data,2)
 
-        items = []
-        
-        for item in validated_data:
-            items.append(SaleItem(sale=sale,**item)) 
-            ids.append(item['medicine'].id)
-            fil |= Q(expiry_date=item["expiry_date"],medicine_id=item["medicine"])
+        amounts = get_amounts(ids,pharmacy_id,fil)
 
-        purchase = PurchaseItem.objects.filter(purchase__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-        sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-        amounts = list(Medicine.objects.filter(id__in=ids).annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)).values_list('amount','id'))
-
-
-        for set_item in amounts:
-            set_id = set_item[1]
-            for item in validated_data:
-                if item["medicine"].id == set_id:
-                    if set_item[0] - item['quantity'] >= 0:
-                       if item['medicine'].min_quanity > set_item[0] - item['quantity']:
-                           print('smaller')
-                    else:
-                        raise serializers.ValidationError({'error':"There is no purchase for medicine in pharmacy with this date or not amount"})
-                    break 
+        check_amounts(amounts,validated_data)
 
         return SaleItem.objects.bulk_create(items)
     
@@ -125,42 +238,18 @@ class SaleAddSerializer(serializers.ModelSerializer):
        fields = ['doctor_name','coustomer_name','items']
 
     def validate_items(self,items):     
-        seen_items = {}
-
-        for item in items:
-
-            if set(item.keys()) != {'medicine', 'quantity', 'price', 'expiry_date'}:
-                raise serializers.ValidationError(_('item should have have medicine quantity and price only'))
-
-            key = (item['medicine'])
-
-            if key in seen_items:
-
-                existing_item = seen_items[key]
-
-                if existing_item['price'] != item['price'] or existing_item['expiry_date'] != item['expiry_date']:
-                    raise serializers.ValidationError(_('same item with diffrent price exist or expiry_date exist'))
-                existing_item['quantity'] += item['quantity']
-            else:
-                seen_items[key] = item
-
-        items.clear()
-        items.extend(seen_items.values())
-        return items
+        return preper_items(items)
     
     def create(self, validated_data):
         items = validated_data.pop('items')
         pharmacy_id=self.context['pharmacy_pk']
         seller_id=self.context['seller']
-        data = validated_data
 
         with transaction.atomic():
-            self.instance = Sale.objects.create(pharmacy_id=pharmacy_id,seller_id=seller_id,**data)
+            self.instance = Sale.objects.create(pharmacy_id=pharmacy_id,seller_id=seller_id,**validated_data)
             new_context = {'sale':self.instance,'pharmacy_pk':pharmacy_id}
-            item_serializer = SaleItemSerializer(data=items,many=True,context=new_context)
-            if not item_serializer.is_valid():
-                raise serializers.ValidationError({'error':_('some items are invalid')})
-            item_serializer.save()
+            
+            create_items(SaleItemSerializer,items,new_context)
 
         return self.instance
 
@@ -170,19 +259,14 @@ class SaleAddSerializer(serializers.ModelSerializer):
         items = validated_data.get('items')
 
         new_context = {'sale':instance,'pharmacy_pk':self.context['pharmacy_pk']}
-        item_serializer = SaleItemSerializer(data=items,many=True,context=new_context)
 
-        if items:
-            with transaction.atomic():
-                instance.items.all().delete()
-                if not item_serializer.is_valid():
-                    raise serializers.ValidationError({'error':_('some items are invalid')})
-                item_serializer.save()
+        update_items(instance,SaleItemSerializer,items,new_context)
          
         return instance
+    
    
-
 ## ########## PURCHASEITEM ##########
+
 
 class PurchaseItemListSerializer(serializers.ListSerializer):
     def create(self, validated_data):
@@ -196,7 +280,9 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
        fields = ['id','medicine','quantity','price','expiry_date']
        list_serializer_class = PurchaseItemListSerializer
    
+
 # ########## PURCHASE ##########
+
 
 class PurchaseListSerializer(serializers.ModelSerializer):
    reciver = serializers.CharField(read_only=True)
@@ -219,28 +305,7 @@ class PurchaseAddSerializer(serializers.ModelSerializer):
         fields = ['items']
 
     def validate_items(self,items):     
-        seen_items = {}
-
-        for item in items:
-
-            if set(item.keys()) != {'medicine', 'quantity', 'price', 'expiry_date'}:
-                raise serializers.ValidationError(_('item should have have medicine quantity and price only'))
-
-            key = (item['medicine'])
-
-            if key in seen_items:
-
-                existing_item = seen_items[key]
-
-                if existing_item['price'] != item['price'] or existing_item['expiry_date'] != item['expiry_date']:
-                    raise serializers.ValidationError(_('same item with diffrent price exist or expiry_date exist'))
-                existing_item['quantity'] += item['quantity']
-            else:
-                seen_items[key] = item
-
-        items.clear()
-        items.extend(seen_items.values())
-        return items
+        return preper_items(items)
 
     def create(self, validated_data):
         reciver_id=self.context['reciver']
@@ -250,10 +315,8 @@ class PurchaseAddSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             self.instance = Purchase.objects.create(reciver_id=reciver_id,pharmacy_id=pharmacy_id)
             new_context = {'purchase':self.instance}
-            item_serializer = PurchaseItemSerializer(data=items,many=True,context=new_context)
-            if not item_serializer.is_valid():
-                raise serializers.ValidationError({'error':_('some items are invalid')})
-            item_serializer.save()
+
+            create_items(PurchaseItemSerializer,items,new_context)
 
         return self.instance
    
@@ -263,40 +326,26 @@ class PurchaseAddSerializer(serializers.ModelSerializer):
         pharmacy_id = self.context['pharmacy_pk']
         new_context = {'purchase':self.instance}
         if items:
-
-            fil = Q()
-            old_dict = {}
-
-            for item in old_items:
-                old_dict[item.medicine.id] = item.expiry_date
-                fil |= Q(expiry_date=item.expiry_date,medicine_id=item.medicine.id)
-    
-            purchase = PurchaseItem.objects.exclude(purchase=instance).filter(purchase__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-            sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-            amounts = list(Medicine.objects.filter(id__in=list(old_dict.keys())).order_by().annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)).values_list('amount','id'))
-
+            
+            old_dict , amounts = purchase_exclude_amounts(instance,old_items,pharmacy_id)
+        
             for set_item in amounts:
                 med_id = set_item[1]
                 for item in items:
-                    if item["medicine"] == med_id and item['expiry_date'] == old_dict[med_id].strftime("%Y-%m-%d"):
+                    if item["medicine"] == med_id and item['expiry_date'] == old_dict[med_id]:
                         res = set_item[0] + item['quantity']
                         if 0 > res:
                             raise serializers.ValidationError({'error':'cant make this change some total amount will become negative'})
                         break
 
-            item_serializer = PurchaseItemSerializer(data=items,many=True,context=new_context)
-
-            with transaction.atomic():
-                old_items.delete()
-                if not item_serializer.is_valid():
-                    raise serializers.ValidationError({'error':_('some items are invalid')})
-                item_serializer.save()
+            update_items(instance,PurchaseItemSerializer,items,new_context)
 
         return instance
    
 
 ## ########## SHIFT ##########
-#
+
+
 class ShiftListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shift
@@ -356,15 +405,16 @@ class ShiftAddSerializer(serializers.ModelSerializer):
             return instance
 
 ## ########## USERROLE ##########
-#
+
 
 class UserRoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserRole
         fields = ['id','role']
 
+
 ## ########## PHARMACY ##########
-#
+
 
 class PharmacyListSerializer(serializers.ModelSerializer):
     class Meta:
@@ -379,7 +429,7 @@ class PharmacySerializer(serializers.ModelSerializer):
 
     
 ## ########## EMPLOYEE ##########
-#
+
 
 class EmployeeListSerializer(serializers.ModelSerializer):
     class Meta:
@@ -446,3 +496,44 @@ class EmployeeCreateSerializer(UCPR):
             else:
                     UserRole.objects.create(user=user,role_id=roles_map[role])
             return user
+        
+
+# ########## COMPANY ##########
+
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ['id','name','phone_number']
+
+
+    def validate_name(self,name):
+        return name.capitalize()
+
+
+## ########## MEDICINE ##########
+
+
+class MedicineSerializer(serializers.ModelSerializer):
+    amount = serializers.IntegerField(read_only=True)
+    class Meta:
+        model = Medicine
+        fields = [
+            'id',
+            'company',
+            'brand_name',
+            'barcode',
+            'sale_price',
+            'purchase_price',
+            'need_prescription',
+            'min_quanity',
+            'type',
+            'amount',
+        ]
+
+    def validate_brand_name(self,brand_name):
+        return brand_name.capitalize()
+
+
+class MedicineUpdateSerializer(MedicineSerializer):
+    class Meta(MedicineSerializer.Meta):
+        fields = MedicineSerializer.Meta.fields + ['is_active']

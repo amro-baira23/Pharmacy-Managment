@@ -127,29 +127,46 @@ class MedicineViewset(viewsets.ModelViewSet):
 
 class PurchaseViewset(viewsets.ModelViewSet):
 
-   def get_queryset(self):
+    def get_queryset(self):
         queryset = Purchase.objects.prefetch_related('reciver').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
         if self.action == 'retrieve':
             queryset = queryset.prefetch_related('items')
         return queryset
    
-   def get_serializer_class(self):
+    def get_serializer_class(self):
         if self.action == 'list':
             return PurchaseListSerializer
         elif self.action == 'retrieve':
             return PurchaseSerializer
         return PurchaseAddSerializer
 
-   def get_serializer_context(self):
+    def get_serializer_context(self):
        user = self.request.user
        reciver = user.id
        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'reciver':reciver}
    
-   def get_permissions(self):
+    def get_permissions(self):
        if self.action == 'delete':
            return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
        return [permissions.IsAuthenticated()]
+        
    
+    def destroy(self, request, *args, **kwargs):
+        purchase = self.get_object()
+        items = purchase.items.select_related('medicine').all()
+        pharmacy_id = self.kwargs['pharmacy_pk']
+
+        with transaction.atomic():
+
+            old_dict ,amounts = purchase_exclude_amounts(purchase,items,pharmacy_id,True)
+
+            for item in amounts:
+                if 0 > item:
+                    raise serializers.ValidationError({'error':'cant make this change some total amount will become negative'})
+           
+            items.delete()
+
+        return super().destroy(request, *args, **kwargs)
       
 
 class SaleViewset(viewsets.ModelViewSet):
@@ -176,4 +193,41 @@ class SaleViewset(viewsets.ModelViewSet):
         if self.action == 'delete':
             return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
         return [permissions.IsAuthenticated()]
+    
+    def destroy(self, request, *args, **kwargs):
+        sale = self.get_object()
+        with transaction.atomic():
+            sale.items.all().delete()
+            return super().destroy(request, *args, **kwargs)
+
+
+class DisposalViewSet(viewsets.ModelViewSet):
+
+    def get_queryset(self):
+            queryset = Disposal.objects.prefetch_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+            if self.action == 'retrieve':
+                queryset = queryset.prefetch_related('items')
+            return queryset
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return DisposalListSerializer
+        elif self.action == 'retrieve':
+            return DisposalSerializer
+        return DisposalAddSerializer
+    
+    def get_serializer_context(self):
+        user = self.request.user.id
+        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'user': user}
+    
+    def get_permissions(self):
+        if self.action == 'delete':
+            return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
+        return [permissions.IsAuthenticated()]
+    
+    def destroy(self, request, *args, **kwargs):
+        disposal = self.get_object()
+        with transaction.atomic():
+            disposal.items.all().delete()
+            return super().destroy(request, *args, **kwargs)
     
