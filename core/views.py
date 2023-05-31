@@ -8,6 +8,7 @@ from .models import *
 from .serializers import *
 from .permissions import *
 
+
 class PharmacyViewSet(viewsets.ModelViewSet):
     serializer_class = PharmacySerializer
 
@@ -148,8 +149,7 @@ class PurchaseViewset(viewsets.ModelViewSet):
     def get_permissions(self):
        if self.action == 'delete':
            return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
-       return [permissions.IsAuthenticated()]
-        
+       return [permissions.IsAuthenticated(),PurchasePermission()]
    
     def destroy(self, request, *args, **kwargs):
         purchase = self.get_object()
@@ -192,7 +192,7 @@ class SaleViewset(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == 'delete':
             return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
-        return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(),SalerPermission()]
     
     def destroy(self, request, *args, **kwargs):
         sale = self.get_object()
@@ -229,5 +229,36 @@ class DisposalViewSet(viewsets.ModelViewSet):
         disposal = self.get_object()
         with transaction.atomic():
             disposal.items.all().delete()
+            return super().destroy(request, *args, **kwargs)
+
+
+class RetriveViewSet(viewsets.ModelViewSet):
+
+    def get_queryset(self):
+            queryset = Returment.objects.prefetch_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+            if self.action == 'retrieve':
+                queryset = queryset.prefetch_related('items')
+            return queryset
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return RetriveListSerializer
+        elif self.action == 'retrieve':
+            return RetriveSerializer
+        return RetriveAddSerializer
+    
+    def get_serializer_context(self):
+        user = self.request.user.id
+        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'user': user}
+    
+    def get_permissions(self):
+        if self.action == 'delete':
+            return [permissions.IsAuthenticated(),ManagerOrPharmacyManagerPermission()]
+        return [permissions.IsAuthenticated(),SalerPermission()]
+    
+    def destroy(self, request, *args, **kwargs):
+        returment = self.get_object()
+        with transaction.atomic():
+            returment.items.all().delete()
             return super().destroy(request, *args, **kwargs)
     

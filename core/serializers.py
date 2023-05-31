@@ -26,6 +26,11 @@ def set_up_items_ids_filter(instance,data,type):
                 items.append(SaleItem(sale=instance,**item)) 
                 ids.append(item['medicine'].id)
                 fil |= Q(expiry_date=item["expiry_date"],medicine_id=item["medicine"])
+        case 3:
+            for item in data:
+                items.append(ReturnedItem(returment=instance,**item)) 
+                ids.append(item['medicine'].id)
+                fil |= Q(expiry_date=item["expiry_date"],medicine_id=item["medicine"])
     
     return items,ids,fil
 
@@ -34,7 +39,8 @@ def get_amounts(ids,pharmacy_id,fil):
     purchase = PurchaseItem.objects.filter(purchase__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
     sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
     dispose = DisposedItem.objects.filter(disposal__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-    amounts = list(Medicine.objects.filter(id__in=ids).annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)).values_list('amount','id'))
+    returment = ReturnedItem.objects.filter(returment__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+    amounts = list(Medicine.objects.filter(id__in=ids).annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)+Coalesce(Subquery(returment),0)).values_list('amount','id'))
 
     return amounts
 
@@ -50,12 +56,13 @@ def purchase_exclude_amounts(instance,items,pharmacy_id,flat=False):
     purchase = PurchaseItem.objects.exclude(purchase=instance).filter(purchase__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
     sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
     dispose = DisposedItem.objects.filter(disposal__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+    returment = ReturnedItem.objects.filter(returment__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
     if flat:
         value = 'amount',
     else:
         value = 'amount','id'
 
-    amounts = list(Medicine.objects.filter(id__in=list(old_dict.keys())).order_by().annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)).values_list(*value,flat=flat))
+    amounts = list(Medicine.objects.filter(id__in=list(old_dict.keys())).order_by().annotate(amount=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)+Coalesce(Subquery(returment),0)).values_list(*value,flat=flat))
 
     return old_dict,amounts
 
@@ -116,7 +123,90 @@ def update_items(instance,serializer,items,context):
             if not item_serializer.is_valid():
                 raise serializers.ValidationError({'error':_('some items are invalid')})
             item_serializer.save()
-      
+
+
+## ########## RETRIVEDITEM ##########
+
+
+class RetrivedItemListSerializer(serializers.ListSerializer):
+    def create(self, validated_data):
+        returment = self.context['returment']
+        pharmacy_id = self.context['pharmacy_pk']
+
+        items,ids,fil = set_up_items_ids_filter(returment,validated_data,3)
+
+        sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        returment = ReturnedItem.objects.filter(returment__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk')).filter(fil).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        amounts = list(Medicine.objects.filter(id__in=ids).annotate(amount=Coalesce(Subquery(sale),0)-Coalesce(Subquery(returment),0)).values_list('amount','id'))
+
+        for set_item in amounts:
+            set_id = set_item[1]
+            for item in validated_data:
+                if item["medicine"].id == set_id:
+                    if  0 > set_item[0] - item['quantity']:
+                        raise serializers.ValidationError({'error':"There is no purchase for medicine in pharmacy with this date or not amount"})
+                    break
+
+        return ReturnedItem.objects.bulk_create(items)
+    
+
+class RetrivedItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReturnedItem
+        fields = ['id','medicine','quantity','price','expiry_date']
+        list_serializer_class = RetrivedItemListSerializer
+
+
+## ########## RETRIVE ##########
+
+
+class RetriveListSerializer(serializers.ModelSerializer):
+   user = serializers.StringRelatedField()
+   class Meta:
+       model = Returment
+       fields = ['id','user','time']
+
+
+class RetriveSerializer(serializers.ModelSerializer):
+    items = RetrivedItemSerializer(many=True)
+    user = serializers.StringRelatedField()
+    class Meta:
+           model = Returment
+           fields = ['id','user','items','time']
+
+
+class RetriveAddSerializer(serializers.ModelSerializer):
+    items = serializers.ListField(child=serializers.DictField(),write_only=True,min_length=1)
+    class Meta:
+       model = Returment
+       fields = ['items']
+
+    def validate_items(self,items):     
+       return preper_items(items)
+    
+    def create(self, validated_data):
+        items = validated_data.pop('items')
+        pharmacy_id = self.context['pharmacy_pk']
+        user_id = self.context['user']
+
+        with transaction.atomic():
+            self.instance = Returment.objects.create(pharmacy_id=pharmacy_id,user_id=user_id)
+            new_context = {'returment':self.instance,'pharmacy_pk':pharmacy_id}
+            
+            create_items(RetrivedItemSerializer,items,new_context)
+
+        return self.instance
+
+    def update(self, instance, validated_data):
+        items = validated_data.get('items')
+
+        new_context = {'returment':instance,'pharmacy_pk':self.context['pharmacy_pk']}
+
+        update_items(instance,RetrivedItemSerializer,items,new_context)
+         
+        return instance
+   
+
 ## ########## DISPOSEDITEM ##########
 
 

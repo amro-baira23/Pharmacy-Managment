@@ -18,12 +18,10 @@ pharmacy_router.register('purchase',PurchaseViewset,basename='pharmacy-purchase'
 
 pharmacy_router.register('sale',SaleViewset,basename='pharmacy-sale')
 
-pharmacy_router.register('dispose',DisposalViewSet,basename='pharmacy-dispse')
+pharmacy_router.register('dispose',DisposalViewSet,basename='pharmacy-dispose')
 
+pharmacy_router.register('retrive',RetriveViewSet,basename='pharmacy-retrive')
 
-# sale_item_router = routers.NestedDefaultRouter(sale_router,'sale',lookup='sale')
-# sale_item_router.register('items',SaleViewset,basename='pharmacy-sale-items')
-
-urls = router.urls + pharmacy_router.urls #+ sale_item_router.urls
+urls = router.urls + pharmacy_router.urls
 
 urlpatterns = urls
