@@ -60,7 +60,8 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
         return EmployeeSerializer
     
     def get_serializer_context(self):
-        return {'pharmacy':self.kwargs['pharmacy_pk']}
+        is_manager = self.request.user.roles.filter(role__name="manager").exists()
+        return {'pharmacy':self.kwargs['pharmacy_pk'],"is_manager":is_manager}
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

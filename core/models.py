@@ -107,7 +107,7 @@ class SaleItem(models.Model):
     sale = models.ForeignKey(Sale,related_name='items',on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField()
     price = models.PositiveIntegerField()
-    expiry_date = models.DateField()
+    expiry_date = models.DateField(validators=[validate_old_date])
     
     class Meta:
         unique_together = [['medicine','sale']]

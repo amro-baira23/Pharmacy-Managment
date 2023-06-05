@@ -568,6 +568,11 @@ class EmployeeCreateSerializer(UCPR):
         model = User
         fields = UCPR.Meta.fields + ("roles","shift",)
 
+    def validate_roles(self,role):
+        if role == 'M' and not self.context['is_manager']:
+            raise serializers.ValidationError('only manager can add another manager')
+        return role
+
     def validate(self, attrs):
         roles = attrs.get("roles")
         del attrs['roles']
