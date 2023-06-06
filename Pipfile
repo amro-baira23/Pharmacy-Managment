@@ -11,6 +11,7 @@ django-debug-toolbar = "*"
 drf-nested-routers = "*"
 django-cors-headers = "*"
 mysqlclient = "*"
+drf-standardized-errors = "*"
 
 [dev-packages]
 

@@ -43,6 +43,7 @@ INSTALLED_APPS = [
 
     'corsheaders',
     'rest_framework',
+    'drf_standardized_errors',
     'djoser',
     'debug_toolbar',
 
@@ -146,12 +147,17 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'EXCEPTION_HANDLER': "drf_standardized_errors.handler.exception_handler"
 }
 
 DJOSER = {
     'SET_PASSWORD_RETYPE' : True,
     'USER_CREATE_PASSWORD_RETYPE':True
 }
+
+DRF_STANDARDIZED_ERRORS = {
+    "EXCEPTION_FORMATTER_CLASS": "custom.handeler.MyFormatter"
+    }
 
 SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
