@@ -22,6 +22,8 @@ pharmacy_router.register('dispose',DisposalViewSet,basename='pharmacy-dispose')
 
 pharmacy_router.register('retrive',RetriveViewSet,basename='pharmacy-retrive')
 
+pharmacy_router.register('unactive_employee',UnactiveEmployeeViewSet,basename='pharmacy-unactive_employee')
+
 urls = router.urls + pharmacy_router.urls
 
 urlpatterns = urls

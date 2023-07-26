@@ -592,8 +592,13 @@ class EmployeeCreateSerializer(UCPR):
                     UserRole.objects.create(user=user,role_id=roles_map[role])
             return user
         
+class UnactEmployeeUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['is_active']
 
-# ########## COMPANY ##########
+
+ ########### COMPANY ##########
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
