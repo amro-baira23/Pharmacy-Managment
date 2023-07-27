@@ -553,7 +553,7 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['first_name','last_name','phone_number','salry','roles','shift']
+        fields = ['first_name','last_name','phone_number','salry','roles','shift','is_active']
 
     def update(self, instance, validated_data):
 
