@@ -27,5 +27,6 @@ pharmacy_router.register('retrive',RetriveViewSet,basename='pharmacy-retrive')
 
 pharmacy_router.register('notification',NotificationList,basename='pharmacy-notification')
 
-urls = router.urls + pharmacy_router.urls
-urlpatterns = urls
+pharmacy_router.register('unactive_employee',UnactiveEmployeeViewSet,basename='pharmacy-unactive_employee')
+
+urlpatterns =  router.urls + pharmacy_router.urls

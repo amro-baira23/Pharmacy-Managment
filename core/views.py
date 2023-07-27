@@ -1,6 +1,7 @@
 from django.utils.translation import gettext as _
 from django.db.models import Sum,Subquery,OuterRef
 from django.db.models.functions import Coalesce
+from rest_framework.decorators import action
 
 from rest_framework import viewsets,response,status,mixins
 from rest_framework.views import APIView
@@ -58,7 +59,7 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
         elif self.action in ['update','partial_update'] :
             return EmployeeUpdateSerializer
         return EmployeeSerializer
-    
+
     def get_serializer_context(self):
         is_manager = self.request.user.roles.filter(role__name="manager").exists()
         return {'pharmacy':self.kwargs['pharmacy_pk'],"is_manager":is_manager}
@@ -69,6 +70,29 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
         instance.save()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
     
+class UnactiveEmployeeViewSet(viewsets.ModelViewSet):
+    http_method_names = ['get','patch','options']
+
+    def partial_update(self, request, *args, **kwargs):
+        request.data.update({"is_active":True})
+        print(request.data)
+        return super().partial_update(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=False)
+        return queryset
+        
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EmployeeListSerializer
+        elif self.action == 'partial_update':
+            return UnactEmployeeUpdateSerializer
+        return EmployeeSerializer
+      
+    def get_serializer_context(self):
+        user = self.request.user.id
+        return {'pharmacy_pk':self.kwargs['pharmacy_pk'],'user': user}
+     
 
 class ShiftViewSet(viewsets.ModelViewSet):
     queryset = Shift.objects.all()
@@ -261,8 +285,8 @@ class RetriveViewSet(viewsets.ModelViewSet):
         returment = self.get_object()
         with transaction.atomic():
             returment.items.all().delete()
-            return super().destroy(request, *args, **kwargs)
-        
+            return super().destroy(request, *args, **kwargs)    
+
 
 class NotificationList(mixins.ListModelMixin,viewsets.GenericViewSet):
     serializer_class = NotificationSerializer
@@ -270,3 +294,6 @@ class NotificationList(mixins.ListModelMixin,viewsets.GenericViewSet):
 
     def get_queryset(self):
         return Notification.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+
+
+
