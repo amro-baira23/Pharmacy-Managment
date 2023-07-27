@@ -26,6 +26,11 @@ class PurchasePermission(permissions.BasePermission):
             return 'manager' in roles or (('pharmacy_manager' in roles or 'purcher' in roles) and request.user.pharmacy.id == int(id))
         return False
 
+class PharmacyManagerPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        roles = request.user.roles.values_list('role',flat=True)
+        return 'pharmacy_manager' in roles 
+
 class ManagerPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         roles = request.user.roles.values_list('role',flat=True)

@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from firebase_admin import credentials
+from firebase_admin import initialize_app
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -46,6 +49,8 @@ INSTALLED_APPS = [
     'drf_standardized_errors',
     'djoser',
     'debug_toolbar',
+    "fcm_django",
+    "django_q",
 
     'core',
     'custom'
@@ -170,6 +175,28 @@ SIMPLE_JWT = {
 }
 
 CORS_ORIGIN_ALLOW_ALL = True
+
+PROJECT_APP = os.path.basename(BASE_DIR)
+
+cred = credentials.Certificate(os.path.join(PROJECT_APP, '../google-services.json'))
+
+initialize_app(cred)
+
+FCM_DJANGO_SETTINGS = {
+    "ONE_DEVICE_PER_USER": True,
+    "DELETE_INACTIVE_DEVICES": True,
+}
+
+Q_CLUSTER = {
+    "name": "shop",
+    "orm": "default",
+    'workers': 8,
+    'recycle': 1,
+    'timeout': 60,
+    'compress': True,
+    'save_limit': 250,
+    'queue_limit': 500,
+}
 
 import mimetypes
 mimetypes.add_type("application/javascript", ".js", True)

@@ -1,5 +1,8 @@
 from .views import *
+from django.urls import path
 from rest_framework_nested import routers
+
+app_name = 'core'
 
 router = routers.DefaultRouter()
 router.register('pharmacy',PharmacyViewSet,basename='pharmacy')
@@ -22,6 +25,7 @@ pharmacy_router.register('dispose',DisposalViewSet,basename='pharmacy-dispose')
 
 pharmacy_router.register('retrive',RetriveViewSet,basename='pharmacy-retrive')
 
-urls = router.urls + pharmacy_router.urls
+pharmacy_router.register('notification',NotificationList,basename='pharmacy-notification')
 
+urls = router.urls + pharmacy_router.urls
 urlpatterns = urls

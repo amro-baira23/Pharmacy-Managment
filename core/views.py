@@ -2,12 +2,12 @@ from django.utils.translation import gettext as _
 from django.db.models import Sum,Subquery,OuterRef
 from django.db.models.functions import Coalesce
 
-from rest_framework import viewsets,response,status
+from rest_framework import viewsets,response,status,mixins
+from rest_framework.views import APIView
 
 from .models import *
 from .serializers import *
 from .permissions import *
-
 
 class PharmacyViewSet(viewsets.ModelViewSet):
     serializer_class = PharmacySerializer
@@ -262,4 +262,11 @@ class RetriveViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             returment.items.all().delete()
             return super().destroy(request, *args, **kwargs)
-    
+        
+
+class NotificationList(mixins.ListModelMixin,viewsets.GenericViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])

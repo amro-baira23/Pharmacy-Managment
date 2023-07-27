@@ -5,6 +5,7 @@ from django.db.models import Sum,Subquery,OuterRef,Q
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 from djoser.serializers import UserCreatePasswordRetypeSerializer as UCPR
+from django_q.tasks import async_task
 
 from .models import *
 User = get_user_model()
@@ -68,17 +69,19 @@ def purchase_exclude_amounts(instance,items,pharmacy_id,flat=False):
 
 
 def check_amounts(amounts,items):
+    shortage_medicines = []
     for set_item in amounts:
             set_id = set_item[1]
             for item in items:
                 if item["medicine"].id == set_id:
                     if set_item[0] - item['quantity'] >= 0:
                        if item['medicine'].min_quanity > set_item[0] - item['quantity']:
-                           print('smaller')
+                           shortage_medicines.append(item['medicine'].id)
                     else:
-                        raise serializers.ValidationError({'error':"There is no purchase for medicine in pharmacy with this date or not amount"})
+                        raise serializers.ValidationError({'error':"There is no purchase for medicine in pharmacy with this date or not enough amount"})
                     break
-
+    
+    return shortage_medicines
 
 def preper_items(items):
     seen_items = {}
@@ -219,10 +222,14 @@ class DisposedItemListSerializer(serializers.ListSerializer):
 
         amounts = get_amounts(ids,pharmacy_id,fil)
 
-        check_amounts(amounts,validated_data)
+        notifaid_medicines = check_amounts(amounts,validated_data)
 
-        return DisposedItem.objects.bulk_create(items)
-    
+        created_items = DisposedItem.objects.bulk_create(items)
+
+        if notifaid_medicines:
+            async_task('core.tasks.send_notifications',pharmacy_id,notifaid_medicines) 
+
+        return created_items
 
 class DisposedItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -293,10 +300,15 @@ class SaleItemListSerializer(serializers.ListSerializer):
 
         amounts = get_amounts(ids,pharmacy_id,fil)
 
-        check_amounts(amounts,validated_data)
+        notifaid_medicines = check_amounts(amounts,validated_data)
 
-        return SaleItem.objects.bulk_create(items)
-    
+        created_items = SaleItem.objects.bulk_create(items)
+
+        if notifaid_medicines:
+            async_task('core.tasks.send_notifications',pharmacy_id,notifaid_medicines) 
+
+        return created_items
+
 
 class SaleItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -632,3 +644,9 @@ class MedicineSerializer(serializers.ModelSerializer):
 class MedicineUpdateSerializer(MedicineSerializer):
     class Meta(MedicineSerializer.Meta):
         fields = MedicineSerializer.Meta.fields + ['is_active']
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['title','body','type','time_stamp']

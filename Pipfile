@@ -12,6 +12,8 @@ drf-nested-routers = "*"
 django-cors-headers = "*"
 mysqlclient = "*"
 drf-standardized-errors = "*"
+fcm-django = "*"
+django-q = "*"
 
 [dev-packages]
 
