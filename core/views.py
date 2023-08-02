@@ -1,13 +1,20 @@
 from django.utils.translation import gettext as _
-from django.db.models import Sum,Subquery,OuterRef
 from django.db.models.functions import Coalesce
-from rest_framework.decorators import action
 
 from rest_framework import viewsets,response,status
+from rest_framework.reverse import reverse
+from rest_framework.decorators import action
+from django_filters import rest_framework as filters
+from drf_multiple_model.viewsets import ObjectMultipleModelAPIViewSet
 
 from .models import *
 from .serializers import *
 from .permissions import *
+from .mixins import *
+from .filters import *
+
+import datetime as dt
+
 
 class PharmacyViewSet(viewsets.ModelViewSet):
     serializer_class = PharmacySerializer
@@ -43,7 +50,9 @@ class PharmacyViewSet(viewsets.ModelViewSet):
 
 class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated,ManagerOrPharmacyManagerPermission]
-
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class  = EmployeeFilter
+    
     def get_queryset(self):
         queryset = User.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'],is_active=True)
         if self.action == 'retrieve':
@@ -69,11 +78,26 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
         instance.save()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
     
+    @action(detail=False,methods=['get'])
+    def shifts(self, request, *args, **kwargs):
+        shifts = Shift.objects.all().order_by('name')
+        api_root = reverse(f'{self.basename}-list',kwargs=kwargs,request=request) 
+
+        data = []
+        for shift in shifts:
+            shift_name = shift.name.replace(' ','+')
+            link = f"{api_root}?shift={shift_name}"
+            item = {f'{shift.name}':link}
+            data.append(item)
+
+        return response.Response(data)
+        
+
 class UnactiveEmployeeViewSet(viewsets.ModelViewSet):
     http_method_names = ['get','patch','options']
 
     def partial_update(self, request, *args, **kwargs):
-        request.data.update({"is_active":True})
+        request.data.update({"is_active": True})
         print(request.data)
         return super().partial_update(request, *args, **kwargs)
 
@@ -124,14 +148,15 @@ class CompanyViewSet(viewsets.ModelViewSet):
 
 
 class MedicineViewset(viewsets.ModelViewSet):
-
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class  = MedicineFilter
     
     def get_queryset(self):
         sales = SaleItem.objects.filter(medicine=OuterRef('pk'),sale__pharmacy_id=1).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
         purchase = PurchaseItem.objects.filter(medicine=OuterRef('pk'),purchase__pharmacy_id=1).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-        return Medicine.objects.annotate(amount=Coalesce(Subquery(purchase),0) - Coalesce(Subquery(sales),0))
-        
-    
+        queryset = Medicine.objects.annotate(amount=Coalesce(Subquery(purchase),0) - Coalesce(Subquery(sales),0))
+        return queryset.order_by('brand_name')
+            
     def get_serializer_class(self):
         if self.request.method in ['PUT','PATCH']:
             return MedicineUpdateSerializer
@@ -149,14 +174,28 @@ class MedicineViewset(viewsets.ModelViewSet):
         medicine.delete()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=False,methods=['get'])
+    def companies(self,request,*args,**kwargs):
+        companies = Company.objects.all().order_by('name')
+        api_root = reverse(f'{self.basename}-list',kwargs=kwargs,request=request) 
 
-class PurchaseViewset(viewsets.ModelViewSet):
+        data = []
+        for company in companies:
+            link = f"{api_root}?company={company.name}"
+            item = {f'{company.name}':link}
+            data.append(item)
 
+        return response.Response(data)
+        
+class PurchaseViewset(StockListMixin,viewsets.ModelViewSet):
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class  = StockFilter
+    
     def get_queryset(self):
         queryset = Purchase.objects.prefetch_related('reciver').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
         if self.action == 'retrieve':
             queryset = queryset.prefetch_related('items')
-        return queryset
+        return queryset.annotate(value=Sum('items__price'))
    
     def get_serializer_class(self):
         if self.action == 'list':
@@ -193,16 +232,18 @@ class PurchaseViewset(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
       
 
-class SaleViewset(viewsets.ModelViewSet):
-
+class SaleViewset(StockListMixin,viewsets.ModelViewSet):
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class  = StockFilter
+    
     def get_queryset(self):
             queryset = Sale.objects.prefetch_related('seller').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             if self.action == 'retrieve':
                 queryset = queryset.prefetch_related('items')
-            return queryset
+            return queryset.annotate(value=Sum('items__price'))
     
     def get_serializer_class(self):
-        if self.action == 'list':
+        if self.action in ['list']:
             return SaleListSerializer
         elif self.action == 'retrieve':
             return SaleSerializer
@@ -223,16 +264,18 @@ class SaleViewset(viewsets.ModelViewSet):
         with transaction.atomic():
             sale.items.all().delete()
             return super().destroy(request, *args, **kwargs)
+        
 
-
-class DisposalViewSet(viewsets.ModelViewSet):
-
+class DisposalViewSet(StockListMixin,viewsets.ModelViewSet):
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class  = StockFilter
+    
     def get_queryset(self):
             queryset = Disposal.objects.prefetch_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             if self.action == 'retrieve':
                 queryset = queryset.prefetch_related('items')
-            return queryset
-    
+            return queryset.annotate(value=Sum('items__price'))
+   
     def get_serializer_class(self):
         if self.action == 'list':
             return DisposalListSerializer
@@ -256,14 +299,17 @@ class DisposalViewSet(viewsets.ModelViewSet):
             return super().destroy(request, *args, **kwargs)
 
 
-class RetriveViewSet(viewsets.ModelViewSet):
-
+class RetriveViewSet(StockListMixin,viewsets.ModelViewSet):
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class  = StockFilter
+    
     def get_queryset(self):
             queryset = Returment.objects.prefetch_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             if self.action == 'retrieve':
                 queryset = queryset.prefetch_related('items')
-            return queryset
-    
+            return queryset.annotate(value=Sum('items__price'))
+   
+
     def get_serializer_class(self):
         if self.action == 'list':
             return RetriveListSerializer
@@ -285,7 +331,24 @@ class RetriveViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             returment.items.all().delete()
             return super().destroy(request, *args, **kwargs)
+        
+
+class TransactionViewset(MultipleStockListMixin,ObjectMultipleModelAPIViewSet):
+        filter_backends = (filters.DjangoFilterBackend,)
+        filterset_class = StockFilter
+
+        def get_querylist(self):
+            querylist = [
+            {'queryset': Sale.objects.all(), 'serializer_class': SaleListSerializer},
+            {'queryset': Purchase.objects.all(), 'serializer_class': PurchaseListSerializer},
+            {'queryset': Returment.objects.all(), 'serializer_class': RetriveListSerializer},
+            {'queryset': Disposal.objects.all(), 'serializer_class': DisposalListSerializer},
+            ]
+            for qs in querylist:
+                qs['queryset'] = qs['queryset'].annotate(value=Sum('items__price'))
+
+            return querylist
 
 
-
-
+        
+  

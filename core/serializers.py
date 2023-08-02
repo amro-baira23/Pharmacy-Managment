@@ -162,9 +162,10 @@ class RetrivedItemSerializer(serializers.ModelSerializer):
 
 class RetriveListSerializer(serializers.ModelSerializer):
    user = serializers.StringRelatedField()
+   value = serializers.IntegerField()
    class Meta:
        model = Returment
-       fields = ['id','user','time']
+       fields = ['id','user','time','value']
 
 
 class RetriveSerializer(serializers.ModelSerializer):
@@ -236,9 +237,10 @@ class DisposedItemSerializer(serializers.ModelSerializer):
 
 class DisposalListSerializer(serializers.ModelSerializer):
    user = serializers.StringRelatedField()
+   value = serializers.IntegerField()
    class Meta:
        model = Disposal
-       fields = ['id','user','time']
+       fields = ['id','user','time','value']
 
 
 class DisposalSerializer(serializers.ModelSerializer):
@@ -308,10 +310,10 @@ class SaleItemSerializer(serializers.ModelSerializer):
 
 class SaleListSerializer(serializers.ModelSerializer):
    seller = serializers.StringRelatedField()
+   value = serializers.IntegerField()
    class Meta:
        model = Sale
-       fields = ['id','seller','time']
-
+       fields = ['id','seller','time',"value"]
 
 class SaleSerializer(serializers.ModelSerializer):
    items = SaleItemSerializer(many=True)
@@ -376,9 +378,10 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
 
 class PurchaseListSerializer(serializers.ModelSerializer):
    reciver = serializers.CharField(read_only=True)
+   value = serializers.IntegerField()
    class Meta:
        model = Purchase
-       fields = ['id','reciver','time']
+       fields = ['id','reciver','time','value']
    
 
 class PurchaseSerializer(serializers.ModelSerializer):

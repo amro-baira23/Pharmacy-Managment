@@ -46,7 +46,9 @@ INSTALLED_APPS = [
     'drf_standardized_errors',
     'djoser',
     'debug_toolbar',
-
+    'django_filters',  
+    'drf_multiple_model',
+    
     'core',
     'custom'
 ]
@@ -147,7 +149,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    'EXCEPTION_HANDLER': "drf_standardized_errors.handler.exception_handler"
+    'EXCEPTION_HANDLER': "drf_standardized_errors.handler.exception_handler",
 }
 
 DJOSER = {

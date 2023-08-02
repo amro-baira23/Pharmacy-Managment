@@ -12,6 +12,9 @@ drf-nested-routers = "*"
 django-cors-headers = "*"
 mysqlclient = "*"
 drf-standardized-errors = "*"
+django-filter = "*"
+django-rest-multiple-models = "*"
+django-crispy-forms = "*"
 
 [dev-packages]
 
