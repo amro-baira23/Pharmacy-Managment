@@ -15,6 +15,8 @@ drf-standardized-errors = "*"
 django-filter = "*"
 django-rest-multiple-models = "*"
 django-crispy-forms = "*"
+fcm-django = "*"
+django-q = "*"
 
 [dev-packages]
 

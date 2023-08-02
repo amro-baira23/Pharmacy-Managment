@@ -179,6 +179,7 @@ class Notification(models.Model):
     title = models.CharField(max_length=255)
     body = models.CharField(max_length=255)
     type = models.CharField(choices=NOTIFICATION_CHOICES,max_length=1)
+    time_stamp = models.DateTimeField(auto_now_add=True)
 
 
 class Disposal(models.Model):

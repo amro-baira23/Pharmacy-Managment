@@ -6,6 +6,8 @@ from rest_framework.reverse import reverse
 from rest_framework.decorators import action
 from django_filters import rest_framework as filters
 from drf_multiple_model.viewsets import ObjectMultipleModelAPIViewSet
+from rest_framework import viewsets,response,status,mixins
+from rest_framework.views import APIView
 
 from .models import *
 from .serializers import *
@@ -93,12 +95,12 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
         return response.Response(data)
         
 
-class UnactiveEmployeeViewSet(viewsets.ModelViewSet):
+class UnactiveEmployeeViewSet(mixins.ListModelMixin,mixins.UpdateModelMixin,viewsets.GenericViewSet):
     http_method_names = ['get','patch','options']
+    permission_classes = [permissions.IsAuthenticated,ManagerOrPharmacyManagerPermission]
 
     def partial_update(self, request, *args, **kwargs):
-        request.data.update({"is_active": True})
-        print(request.data)
+        request.data.update({"is_active":True})
         return super().partial_update(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -108,9 +110,8 @@ class UnactiveEmployeeViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'list':
             return EmployeeListSerializer
-        elif self.action == 'partial_update':
+        else:
             return UnactEmployeeUpdateSerializer
-        return EmployeeSerializer
       
     def get_serializer_context(self):
         user = self.request.user.id
@@ -349,6 +350,15 @@ class TransactionViewset(MultipleStockListMixin,ObjectMultipleModelAPIViewSet):
 
             return querylist
 
+            return super().destroy(request, *args, **kwargs)    
+
+
+class NotificationList(mixins.ListModelMixin,viewsets.GenericViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
 
         
   
