@@ -1,6 +1,6 @@
 from rest_framework import response
 from rest_framework.decorators import action
-from rest_framework.reverse import reverse
+from rest_framework.reverse import reverse_lazy,reverse
 
 from django.db.models import Sum
 
@@ -22,34 +22,11 @@ class StockListMixin:
      
         return response.Response([data])
     
-    # def get_today(self):
-    #     return dt.date.today()
-    
-    # def get_this_week(self):
-    #     date = dt.date.today()
-    #     this_week = (date.weekday() + 2) % 7
-    #     return date - dt.timedelta(days=this_week)
-    
-    # def get_this_month(self):
-    #     return dt.date.today().replace(day=1)
-
-    # @action(detail=False,methods=['get'])
-    # def today(self,request,**kwargs):
-    #     return self.list(self,request)
-
-    # @action(detail=False,methods=['get'])
-    # def this_week(self,request,**kwargs):
-    #     return self.list(self,request)
-    
-    # @action(detail=False,methods=['get'])
-    # def this_month(self,request,**kwargs):
-    #     return self.list(self,request)
-    
     @action(detail=False,methods=['get'])
     def months(self,request,**kwargs):
         queryset = self.get_queryset()
         dates = queryset.dates(field_name='time_stamp',kind='month') 
-        api_root = reverse(f'{self.basename}-list',kwargs=kwargs,request=request) 
+        api_root = reverse(f'core:{self.basename}-list',kwargs=kwargs,request=request) 
 
         data = []
         for i,date in enumerate(dates):
@@ -69,9 +46,10 @@ class MultipleStockListMixin:
         results = self.get_empty_results()
 
         for query_data in querylist:
-            query_data['queryset'] = query_data['queryset'].annotate(value=Sum('items__price'))
 
             self.check_query_data(query_data)
+
+            query_data['queryset'] = self.filter_queryset(query_data['queryset'])
 
             queryset = self.load_queryset(query_data, request, *args, **kwargs)
 
@@ -110,7 +88,7 @@ class MultipleStockListMixin:
         querylist = self.get_querylist()
         queryset = querylist[0]['queryset']
         dates = queryset.dates(field_name='time_stamp',kind='month') 
-        api_root = reverse(f'{self.basename}-list',kwargs=kwargs,request=request) 
+        api_root = reverse_lazy(f'core:{self.basename}-list',kwargs=kwargs,request=request) 
 
         data = []
         for i,date in enumerate(dates):
@@ -118,5 +96,6 @@ class MultipleStockListMixin:
             link = api_root + f'?since={date}&before={after_month}'
             date = {str(date):link}
             data.append(date)
-            
+
+        data = {'links':data}
         return response.Response(data)

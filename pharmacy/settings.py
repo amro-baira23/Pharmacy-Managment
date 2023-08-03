@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'django_filters',  
     'drf_multiple_model',
+    'django_extensions',
     
     "fcm_django",
     "django_q",

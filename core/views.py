@@ -2,7 +2,7 @@ from django.utils.translation import gettext as _
 from django.db.models.functions import Coalesce
 
 from rest_framework import viewsets,response,status
-from rest_framework.reverse import reverse
+from django.urls import reverse
 from rest_framework.decorators import action
 from django_filters import rest_framework as filters
 from drf_multiple_model.viewsets import ObjectMultipleModelAPIViewSet
@@ -83,8 +83,9 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     @action(detail=False,methods=['get'])
     def shifts(self, request, *args, **kwargs):
         shifts = Shift.objects.all().order_by('name')
-        api_root = reverse(f'{self.basename}-list',kwargs=kwargs,request=request) 
-
+        print(self.basename)
+        api_root = reverse_lazy(f'core:{self.basename}-list',kwargs=kwargs,request=request) 
+        
         data = []
         for shift in shifts:
             shift_name = shift.name.replace(' ','+')
@@ -178,7 +179,7 @@ class MedicineViewset(viewsets.ModelViewSet):
     @action(detail=False,methods=['get'])
     def companies(self,request,*args,**kwargs):
         companies = Company.objects.all().order_by('name')
-        api_root = reverse(f'{self.basename}-list',kwargs=kwargs,request=request) 
+        api_root = reverse(f'core:{self.basename}-list',kwargs=kwargs,request=request) 
 
         data = []
         for company in companies:
@@ -337,7 +338,7 @@ class RetriveViewSet(StockListMixin,viewsets.ModelViewSet):
 class TransactionViewset(MultipleStockListMixin,ObjectMultipleModelAPIViewSet):
         filter_backends = (filters.DjangoFilterBackend,)
         filterset_class = StockFilter
-
+        
         def get_querylist(self):
             querylist = [
             {'queryset': Sale.objects.all(), 'serializer_class': SaleListSerializer},
@@ -347,11 +348,9 @@ class TransactionViewset(MultipleStockListMixin,ObjectMultipleModelAPIViewSet):
             ]
             for qs in querylist:
                 qs['queryset'] = qs['queryset'].annotate(value=Sum('items__price'))
-
             return querylist
 
-            return super().destroy(request, *args, **kwargs)    
-
+        
 
 class NotificationList(mixins.ListModelMixin,viewsets.GenericViewSet):
     serializer_class = NotificationSerializer
