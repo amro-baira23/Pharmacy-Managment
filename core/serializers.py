@@ -83,6 +83,7 @@ def check_amounts(amounts,items):
     
     return shortage_medicines
 
+
 def preper_items(items):
     seen_items = {}
 
@@ -398,6 +399,7 @@ class PurchaseListSerializer(serializers.ModelSerializer):
 
 class PurchaseSerializer(serializers.ModelSerializer):
    items = PurchaseItemSerializer(many=True)
+   reciver = serializers.StringRelatedField()
    class Meta:
        model = Purchase
        fields = ['id','reciver','time','items']
@@ -629,7 +631,6 @@ class CompanySerializer(serializers.ModelSerializer):
 
 
 class MedicineSerializer(serializers.ModelSerializer):
-    amount = serializers.IntegerField(read_only=True)
     class Meta:
         model = Medicine
         fields = [
@@ -642,7 +643,6 @@ class MedicineSerializer(serializers.ModelSerializer):
             'need_prescription',
             'min_quanity',
             'type',
-            'amount',
         ]
 
     def validate_brand_name(self,brand_name):

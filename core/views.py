@@ -1,5 +1,4 @@
 from django.utils.translation import gettext as _
-from django.db.models.functions import Coalesce
 
 from rest_framework import viewsets,response,status
 from django.urls import reverse
@@ -7,16 +6,12 @@ from rest_framework.decorators import action
 from django_filters import rest_framework as filters
 from drf_multiple_model.viewsets import ObjectMultipleModelAPIViewSet
 from rest_framework import viewsets,response,status,mixins
-from rest_framework.views import APIView
 
 from .models import *
 from .serializers import *
 from .permissions import *
 from .mixins import *
 from .filters import *
-
-import datetime as dt
-
 
 class PharmacyViewSet(viewsets.ModelViewSet):
     serializer_class = PharmacySerializer
@@ -152,12 +147,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
 class MedicineViewset(viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class  = MedicineFilter
-    
-    def get_queryset(self):
-        sales = SaleItem.objects.filter(medicine=OuterRef('pk'),sale__pharmacy_id=1).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-        purchase = PurchaseItem.objects.filter(medicine=OuterRef('pk'),purchase__pharmacy_id=1).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
-        queryset = Medicine.objects.annotate(amount=Coalesce(Subquery(purchase),0) - Coalesce(Subquery(sales),0))
-        return queryset.order_by('brand_name')
+    queryset = Medicine.objects.all()
             
     def get_serializer_class(self):
         if self.request.method in ['PUT','PATCH']:
@@ -194,7 +184,7 @@ class PurchaseViewset(StockListMixin,viewsets.ModelViewSet):
     filterset_class  = StockFilter
     
     def get_queryset(self):
-        queryset = Purchase.objects.prefetch_related('reciver').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+        queryset = Purchase.objects.select_related('reciver').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
         if self.action == 'retrieve':
             queryset = queryset.prefetch_related('items')
         return queryset.annotate(value=Sum('items__price'))
@@ -239,7 +229,7 @@ class SaleViewset(StockListMixin,viewsets.ModelViewSet):
     filterset_class  = StockFilter
     
     def get_queryset(self):
-            queryset = Sale.objects.prefetch_related('seller').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+            queryset = Sale.objects.select_related('seller').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             if self.action == 'retrieve':
                 queryset = queryset.prefetch_related('items')
             return queryset.annotate(value=Sum('items__price'))
@@ -273,7 +263,7 @@ class DisposalViewSet(StockListMixin,viewsets.ModelViewSet):
     filterset_class  = StockFilter
     
     def get_queryset(self):
-            queryset = Disposal.objects.prefetch_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+            queryset = Disposal.objects.select_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             if self.action == 'retrieve':
                 queryset = queryset.prefetch_related('items')
             return queryset.annotate(value=Sum('items__price'))
@@ -306,7 +296,7 @@ class RetriveViewSet(StockListMixin,viewsets.ModelViewSet):
     filterset_class  = StockFilter
     
     def get_queryset(self):
-            queryset = Returment.objects.prefetch_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+            queryset = Returment.objects.select_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             if self.action == 'retrieve':
                 queryset = queryset.prefetch_related('items')
             return queryset.annotate(value=Sum('items__price'))
