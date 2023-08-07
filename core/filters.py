@@ -9,16 +9,21 @@ User = get_user_model()
 class MedicineFilter(filters.FilterSet):
     brand_name = filters.CharFilter(field_name='brand_name',lookup_expr='icontains',label='brand_name')
     company = filters.CharFilter(field_name='company__name',lookup_expr='icontains',label='company')
-    ordering = filters.OrderingFilter(fields=(('amount','quantity'),))
+    ordering = filters.OrderingFilter(fields=('brand_name',))
                                       
     class Meta:
         model = Medicine
         fields = ['type','barcode']        
 
-
+class InventoryFilter(filters.FilterSet):
+    brand_name = filters.CharFilter(field_name='brand_name',lookup_expr='icontains',label='brand_name')
+    company = filters.CharFilter(field_name='company__name',lookup_expr='icontains',label='company')
+    ordering = filters.OrderingFilter(fields=('brand_name','quantity'))
+                                      
 class StockFilter(filters.FilterSet):
     date = filters.DateRangeFilter(field_name='time_stamp')
     since = filters.DateFilter(field_name='time_stamp',lookup_expr='gte')
+    until = filters.DateFilter(field_name='time_stamp',lookup_expr='lte')
     before = filters.DateFilter(field_name='time_stamp',lookup_expr='lt')
     ordering = filters.OrderingFilter(fields=('value','time_stamp'))
 

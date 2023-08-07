@@ -31,4 +31,6 @@ pharmacy_router.register('unactive_employee',UnactiveEmployeeViewSet,basename='p
 
 pharmacy_router.register('transaction',TransactionViewset,basename='transaction')
 
+pharmacy_router.register('inventory',InventoryViewset,basename='inventory')
+
 urlpatterns =  router.urls + pharmacy_router.urls

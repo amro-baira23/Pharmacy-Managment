@@ -1,7 +1,6 @@
 from django.utils.translation import gettext as _
 
 from rest_framework import viewsets,response,status
-from django.urls import reverse
 from rest_framework.decorators import action
 from django_filters import rest_framework as filters
 from drf_multiple_model.viewsets import ObjectMultipleModelAPIViewSet
@@ -79,7 +78,7 @@ class PharmacyEmployeeViewSet(viewsets.ModelViewSet):
     def shifts(self, request, *args, **kwargs):
         shifts = Shift.objects.all().order_by('name')
         print(self.basename)
-        api_root = reverse_lazy(f'core:{self.basename}-list',kwargs=kwargs,request=request) 
+        api_root = reverse(f'core:{self.basename}-list',kwargs=kwargs,request=request) 
         
         data = []
         for shift in shifts:
@@ -178,16 +177,30 @@ class MedicineViewset(viewsets.ModelViewSet):
             data.append(item)
 
         return response.Response(data)
-        
+    
+class InventoryViewset(mixins.ListModelMixin,viewsets.GenericViewSet):
+    filter_backends = (filters.DjangoFilterBackend,)
+    filterset_class  = InventoryFilter
+    serializer_class = MedicineListSerializer
+    def get_queryset(self):
+        purchase = PurchaseItem.objects.filter(purchase__pharmacy_id=self.kwargs["pharmacy_pk"],medicine_id=OuterRef('pk')).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        sale = SaleItem.objects.filter(sale__pharmacy_id=self.kwargs["pharmacy_pk"],medicine_id=OuterRef('pk')).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        dispose = DisposedItem.objects.filter(disposal__pharmacy_id=self.kwargs["pharmacy_pk"],medicine_id=OuterRef('pk')).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        returment = ReturnedItem.objects.filter(returment__pharmacy_id=self.kwargs["pharmacy_pk"],medicine_id=OuterRef('pk')).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+        queryset = Medicine.objects.filter(purchase_items__purchase__pharmacy_id=self.kwargs["pharmacy_pk"]).distinct().annotate(quantity=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)+Coalesce(Subquery(returment),0))
+        return queryset
+
+
 class PurchaseViewset(StockListMixin,viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class  = StockFilter
     
     def get_queryset(self):
-        queryset = Purchase.objects.select_related('reciver').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
+        queryset = Purchase.objects.select_related('reciver')\
+        .filter(pharmacy_id=self.kwargs['pharmacy_pk'])
         if self.action == 'retrieve':
             queryset = queryset.prefetch_related('items')
-        return queryset.annotate(value=Sum('items__price'))
+        return queryset.annotate(value=Sum(F('items__quantity')*F('items__price')))
    
     def get_serializer_class(self):
         if self.action == 'list':
@@ -232,7 +245,7 @@ class SaleViewset(StockListMixin,viewsets.ModelViewSet):
             queryset = Sale.objects.select_related('seller').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             if self.action == 'retrieve':
                 queryset = queryset.prefetch_related('items')
-            return queryset.annotate(value=Sum('items__price'))
+            return queryset.annotate(value=Sum(F('items__quantity')*F('items__price')))
     
     def get_serializer_class(self):
         if self.action in ['list']:
@@ -266,8 +279,8 @@ class DisposalViewSet(StockListMixin,viewsets.ModelViewSet):
             queryset = Disposal.objects.select_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             if self.action == 'retrieve':
                 queryset = queryset.prefetch_related('items')
-            return queryset.annotate(value=Sum('items__price'))
-   
+            return queryset.annotate(value=Sum(F('items__quantity')*F('items__price')))
+    
     def get_serializer_class(self):
         if self.action == 'list':
             return DisposalListSerializer
@@ -299,8 +312,7 @@ class RetriveViewSet(StockListMixin,viewsets.ModelViewSet):
             queryset = Returment.objects.select_related('user').filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             if self.action == 'retrieve':
                 queryset = queryset.prefetch_related('items')
-            return queryset.annotate(value=Sum('items__price'))
-   
+            return queryset.annotate(value=Sum(F('items__quantity')*F('items__price')))
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -331,13 +343,15 @@ class TransactionViewset(MultipleStockListMixin,ObjectMultipleModelAPIViewSet):
         
         def get_querylist(self):
             querylist = [
-            {'queryset': Sale.objects.all(), 'serializer_class': SaleListSerializer},
             {'queryset': Purchase.objects.all(), 'serializer_class': PurchaseListSerializer},
+            {'queryset': Sale.objects.all(), 'serializer_class': SaleListSerializer},
             {'queryset': Returment.objects.all(), 'serializer_class': RetriveListSerializer},
             {'queryset': Disposal.objects.all(), 'serializer_class': DisposalListSerializer},
             ]
             for qs in querylist:
-                qs['queryset'] = qs['queryset'].annotate(value=Sum('items__price'))
+                qs['queryset'] = qs['queryset'].filter(pharmacy_id=self.kwargs['pharmacy_pk']).\
+                annotate(value=Sum(ExpressionWrapper(F('items__quantity')*F('items__price'),\
+                output_field=models.PositiveIntegerField())))
             return querylist
 
         
