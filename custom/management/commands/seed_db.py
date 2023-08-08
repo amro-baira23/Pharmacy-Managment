@@ -3,7 +3,9 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from custom.models import User
-from core.models import Pharmacy,UserRole,Shift,ShiftDay
+from core.models import Pharmacy,UserRole,Shift,ShiftDay,Medicine,Company
+
+import random
 
 class Command(BaseCommand):
     help = "create owner manager and employee with a pharmacy"
@@ -36,5 +38,23 @@ class Command(BaseCommand):
                     UserRole(role_id='saller',user=both),
                     UserRole(role_id='purcher',user=both),
                 ])
+            
+
+            Company.objects.create(name="company1",phone_number="0941546219",)
+            Company.objects.create(name="company2",phone_number="0992244237"),
+
+            names = ["sytamol","probanolol","zednad","calce dal","brophine","syrosat","coldphrine"]
+            numbers = ['1','2','3','4','5','6','7','8','9','0']
+            types = ['LIQ', 'TAB', 'CAP', 'DRO', 'INJ', 'SUP', 'INH', 'TOP']
+
+            meds = [Medicine(company_id=random.randint(1,2),brand_name=random.choice(names),barcode=''.join(random.choices(numbers,k=13)),
+                        sale_price = random.randint(100,5000),
+                        purchase_price = random.randint(100,5000),
+                        type = random.choice(types)
+                        ) for _ in range(10) ]
+            
+            Medicine.objects.bulk_create(
+                meds
+            )            
 
             print("Finished Seeding the data base")

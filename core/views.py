@@ -1,11 +1,10 @@
 from django.utils.translation import gettext as _
 
-from rest_framework import viewsets,response,status
 from django.urls import reverse
 from rest_framework.decorators import action
 from django_filters import rest_framework as filters
+from django.db.models import Case,When,F
 from drf_multiple_model.viewsets import ObjectMultipleModelAPIViewSet
-from rest_framework import viewsets,response,status,mixins
 
 from .models import *
 from .serializers import *
@@ -96,6 +95,7 @@ class UnactiveEmployeeViewSet(mixins.ListModelMixin,mixins.UpdateModelMixin,view
     permission_classes = [permissions.IsAuthenticated,ManagerOrPharmacyManagerPermission]
 
     def partial_update(self, request, *args, **kwargs):
+        request.data._mutable = True
         request.data.update({"is_active":True})
         return super().partial_update(request, *args, **kwargs)
 
@@ -213,7 +213,7 @@ class PurchaseViewset(StockListMixin,viewsets.ModelViewSet):
 
         with transaction.atomic():
 
-            old_dict ,amounts = purchase_exclude_amounts(purchase,items,pharmacy_id,True)
+            _ ,amounts = purchase_exclude_amounts(purchase,items,pharmacy_id,True)
 
             for item in amounts:
                 if 0 > item:
@@ -350,4 +350,24 @@ class NotificationList(mixins.ListModelMixin,viewsets.GenericViewSet):
         return Notification.objects.filter(pharmacy_id=self.kwargs['pharmacy_pk'])
 
         
-  
+class EqualViewSet(ListCreateOnly):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        med_id = self.kwargs['medicine_pk']
+        fil = Q(medicine1__id = med_id) | Q(medicine2__id = med_id)
+
+        subquery = EqualMedicine.objects.filter(fil).annotate(medicine=Case(
+                                            When(medicine1 = med_id, then=F("medicine2")),
+                                            When(medicine2 = med_id, then=F("medicine1")),
+                                         )).values('medicine')
+
+        return Medicine.objects.filter(id__in=Subquery(subquery)).values('id','brand_name')
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return EqualsCreateSerializer
+        return MedicineListSerializer
+
+    def get_serializer_context(self):
+        return {'medicine':int(self.kwargs['medicine_pk'])}

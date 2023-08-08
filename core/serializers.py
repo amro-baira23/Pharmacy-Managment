@@ -7,7 +7,9 @@ from rest_framework import serializers
 from djoser.serializers import UserCreatePasswordRetypeSerializer as UCPR
 from django_q.tasks import async_task
 
+import itertools
 from .models import *
+
 User = get_user_model()
 
 def set_up_items_ids_filter(instance,data,type):
@@ -148,7 +150,7 @@ class RetrivedItemListSerializer(serializers.ListSerializer):
             for item in validated_data:
                 if item["medicine"].id == set_id:
                     if  0 > set_item[0] - item['quantity']:
-                        raise serializers.ValidationError({'error':"There is no purchase for medicine in pharmacy with this date or not amount"})
+                        raise serializers.ValidationError({'error':"returned items are more than the saled items"})
                     break
 
         return ReturnedItem.objects.bulk_create(items)
@@ -175,9 +177,10 @@ class RetriveListSerializer(serializers.ModelSerializer):
 class RetriveSerializer(serializers.ModelSerializer):
     items = RetrivedItemSerializer(many=True)
     user = serializers.StringRelatedField()
+    value = serializers.IntegerField()
     class Meta:
            model = Returment
-           fields = ['id','user','items','time']
+           fields = ['id','user','items','time','value']
 
 
 class RetriveAddSerializer(serializers.ModelSerializer):
@@ -254,9 +257,10 @@ class DisposalListSerializer(serializers.ModelSerializer):
 class DisposalSerializer(serializers.ModelSerializer):
     items = DisposedItemSerializer(many=True)
     user = serializers.StringRelatedField()
+    value = serializers.IntegerField()
     class Meta:
            model = Disposal
-           fields = ['id','user','items','time']
+           fields = ['id','user','items','time','value']
 
 
 class DisposalAddSerializer(serializers.ModelSerializer):
@@ -322,18 +326,19 @@ class SaleItemSerializer(serializers.ModelSerializer):
 ## ########## SALE ##########
 
 class SaleListSerializer(serializers.ModelSerializer):
-   seller = serializers.StringRelatedField()
+   user = serializers.StringRelatedField(source="seller")
    value = serializers.IntegerField()
    class Meta:
        model = Sale
-       fields = ['id','seller','time',"value"]
+       fields = ['id','user','time',"value"]
 
 class SaleSerializer(serializers.ModelSerializer):
    items = SaleItemSerializer(many=True)
-   seller = serializers.StringRelatedField()
+   user = serializers.StringRelatedField(source="seller")
+   value = serializers.IntegerField()
    class Meta:
        model = Sale
-       fields = ['id','seller','doctor_name','coustomer_name','items','time']
+       fields = ['id','user','doctor_name','coustomer_name','items','time','value']
 
 
 class SaleAddSerializer(serializers.ModelSerializer):
@@ -390,19 +395,20 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
 
 
 class PurchaseListSerializer(serializers.ModelSerializer):
-   reciver = serializers.CharField(read_only=True)
+   user = serializers.StringRelatedField(source="reciver")
    value = serializers.IntegerField()
    class Meta:
        model = Purchase
-       fields = ['id','reciver','time','value']
+       fields = ['id','user','time','value']
    
 
 class PurchaseSerializer(serializers.ModelSerializer):
    items = PurchaseItemSerializer(many=True)
-   reciver = serializers.StringRelatedField()
+   user = serializers.StringRelatedField(source="reciver")
+   value = serializers.IntegerField()
    class Meta:
        model = Purchase
-       fields = ['id','reciver','time','items']
+       fields = ['id','user','time','items','value']
  
 
 class PurchaseAddSerializer(serializers.ModelSerializer):
@@ -628,7 +634,10 @@ class CompanySerializer(serializers.ModelSerializer):
 
 
 ## ########## MEDICINE ##########
-
+class MedicineListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Medicine
+        fields = ['id','brand_name']
 
 class MedicineSerializer(serializers.ModelSerializer):
     class Meta:
@@ -657,4 +666,48 @@ class MedicineUpdateSerializer(MedicineSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
-        fields = ['title','body','type','time_stamp']
+        fields = ['title','body','type','time']
+
+
+class EqualsCreateSerializer(serializers.ModelSerializer):
+    ids = serializers.ListField(child=serializers.IntegerField(),write_only=True,min_length=2)
+    class Meta:
+        model = EqualMedicine
+        fields = ['ids']
+
+    def validate_ids(self,ids):
+        if self.context['medicine'] in ids:
+            raise serializers.ValidationError("medicine cant equl its self")
+        elif Medicine.objects.filter(id__in=ids).count() != len(ids):
+            raise serializers.ValidationError("some ids are invalid")
+        return ids
+
+    def save(self, **kwargs):
+        med_id = self.context['medicine']
+        ids = self.validated_data.pop("ids")
+        ids.append(med_id)
+        fil = Q(medicine1__id__in = ids,medicine2__id__in=ids)        
+        exisisted = list(EqualMedicine.objects.filter(fil).values_list("medicine1","medicine2"))
+        set_ids = list(itertools.combinations(ids, 2))
+        equals = []
+
+        for x in set_ids:
+            if x not in exisisted and x[::-1] not in exisisted:
+                equals.append(EqualMedicine(medicine1_id=x[0],medicine2_id=x[1]))
+
+        with transaction.atomic():
+            EqualMedicine.objects.bulk_create(equals)
+
+        return {}
+
+
+class EqualMedicineSerializer(serializers.ModelSerializer):
+    medicine = serializers.SerializerMethodField("get_medicine")
+    class Meta:
+        model = EqualMedicine
+        fields = ['medicine']
+
+    def get_medicine(self,EqualMedicine):
+        meds = Medicine.objects.filter(id=EqualMedicine.medicine)
+        ser = MedicineListSerializer(meds,many=True)
+        return ser.data

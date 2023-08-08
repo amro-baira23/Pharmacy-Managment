@@ -84,9 +84,12 @@ class Medicine(models.Model):
     
 
 class EqualMedicine(models.Model):
-    medicine = models.OneToOneField(Medicine,primary_key=True,on_delete=models.CASCADE)
-    name = models.CharField(max_length=50)
+    medicine1 = models.ForeignKey(Medicine,on_delete=models.CASCADE,related_name="med1")
+    medicine2 = models.ForeignKey(Medicine,on_delete=models.CASCADE,related_name="med2")
 
+
+    def __str__(self) -> str:
+        return f"{self.medicine1.id} + {self.medicine2.id}"
 
 class Sale(models.Model):
     pharmacy = models.ForeignKey(Pharmacy,related_name='sales',on_delete=models.PROTECT)
@@ -180,6 +183,9 @@ class Notification(models.Model):
     body = models.CharField(max_length=255)
     type = models.CharField(choices=NOTIFICATION_CHOICES,max_length=1)
     time_stamp = models.DateTimeField(auto_now_add=True)
+
+    def time(self):
+        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
 
 
 class Disposal(models.Model):

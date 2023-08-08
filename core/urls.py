@@ -13,6 +13,10 @@ router.register('company',CompanyViewSet,basename='company')
 
 router.register('medicine',MedicineViewset,basename='medicine')
 
+medicine_router = routers.NestedDefaultRouter(router,'medicine',lookup='medicine')
+
+medicine_router.register('equals',EqualViewSet,basename='medicine-equals')
+
 pharmacy_router = routers.NestedDefaultRouter(router,'pharmacy',lookup='pharmacy')
 
 pharmacy_router.register('employee',PharmacyEmployeeViewSet,basename='pharmacy-employees')
@@ -31,4 +35,4 @@ pharmacy_router.register('unactive_employee',UnactiveEmployeeViewSet,basename='p
 
 pharmacy_router.register('transaction',TransactionViewset,basename='transaction')
 
-urlpatterns =  router.urls + pharmacy_router.urls
+urlpatterns =  router.urls + pharmacy_router.urls + medicine_router.urls
