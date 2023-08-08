@@ -639,6 +639,19 @@ class MedicineListSerializer(serializers.ModelSerializer):
         model = Medicine
         fields = ['id','brand_name']
 
+class MedicineListSerializer(serializers.ModelSerializer):
+    quantity = serializers.IntegerField()
+    class Meta:
+        model = Medicine
+        fields = [
+            'id',
+            'brand_name',
+            'company',
+            'quantity'
+        ]
+
+
+
 class MedicineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Medicine
