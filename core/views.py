@@ -207,7 +207,7 @@ class InventoryViewset(mixins.ListModelMixin,viewsets.GenericViewSet):
 
         returment = ReturnedItem.objects.filter(returment__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk'),expiry_date=OuterRef("purchase_items__expiry_date")).values('medicine','expiry_date').annotate(amount_sum=Sum('quantity')).values('amount_sum')
 
-        batch = Medicine.objects.filter(id=self.kwargs['pk'],purchase_items__purchase__pharmacy_id=pharmacy_id).annotate(batch = F('purchase_items__expiry_date')).annotate(quantity=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)+Coalesce(Subquery(returment),0)).values("time","amount").distinct()
+        batch = Medicine.objects.filter(id=self.kwargs['pk'],purchase_items__purchase__pharmacy_id=pharmacy_id).annotate(batch = F('purchase_items__expiry_date')).annotate(quantity=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)+Coalesce(Subquery(returment),0)).values("batch","quantity").distinct()
         return response.Response(batch)
     
 class PurchaseViewset(StockListMixin,viewsets.ModelViewSet):
