@@ -182,6 +182,7 @@ class InventoryViewset(mixins.ListModelMixin,viewsets.GenericViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class  = InventoryFilter
     serializer_class = MedicineListSerializer
+
     def get_queryset(self):
         purchase = PurchaseItem.objects.filter(purchase__pharmacy_id=self.kwargs["pharmacy_pk"],medicine_id=OuterRef('pk')).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
         sale = SaleItem.objects.filter(sale__pharmacy_id=self.kwargs["pharmacy_pk"],medicine_id=OuterRef('pk')).values('medicine').annotate(amount_sum=Sum('quantity')).values('amount_sum')
@@ -190,7 +191,25 @@ class InventoryViewset(mixins.ListModelMixin,viewsets.GenericViewSet):
         queryset = Medicine.objects.filter(purchase_items__purchase__pharmacy_id=self.kwargs["pharmacy_pk"]).distinct().annotate(quantity=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)+Coalesce(Subquery(returment),0))
         return queryset
 
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [ManagerPermission()]
+    
+    @action(detail=True,methods=["get"])
+    def batches(self,request,*args,**kwargs):
+        pharmacy_id = self.kwargs['pharmacy_pk']
+        purchase = PurchaseItem.objects.filter(purchase__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk'),expiry_date=OuterRef("purchase_items__expiry_date")).values('medicine','expiry_date').annotate(amount_sum=Sum('quantity')).values('amount_sum')
 
+        sale = SaleItem.objects.filter(sale__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk'),expiry_date=OuterRef("purchase_items__expiry_date")).values('medicine','expiry_date').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+
+        dispose = DisposedItem.objects.filter(disposal__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk'),expiry_date=OuterRef("purchase_items__expiry_date")).values('medicine','expiry_date').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+
+        returment = ReturnedItem.objects.filter(returment__pharmacy_id=pharmacy_id,medicine_id=OuterRef('pk'),expiry_date=OuterRef("purchase_items__expiry_date")).values('medicine','expiry_date').annotate(amount_sum=Sum('quantity')).values('amount_sum')
+
+        batch = Medicine.objects.filter(id=self.kwargs['pk'],purchase_items__purchase__pharmacy_id=pharmacy_id).annotate(batch = F('purchase_items__expiry_date')).annotate(quantity=Coalesce(Subquery(purchase),0)-Coalesce(Subquery(sale),0)-Coalesce(Subquery(dispose),0)+Coalesce(Subquery(returment),0)).values("time","amount").distinct()
+        return response.Response(batch)
+    
 class PurchaseViewset(StockListMixin,viewsets.ModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class  = StockFilter
@@ -349,9 +368,7 @@ class TransactionViewset(MultipleStockListMixin,ObjectMultipleModelAPIViewSet):
             {'queryset': Disposal.objects.all(), 'serializer_class': DisposalListSerializer},
             ]
             for qs in querylist:
-                qs['queryset'] = qs['queryset'].filter(pharmacy_id=self.kwargs['pharmacy_pk']).\
-                annotate(value=Sum(ExpressionWrapper(F('items__quantity')*F('items__price'),\
-                output_field=models.PositiveIntegerField())))
+                qs['queryset'] = qs['queryset'].filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             return querylist
 
         

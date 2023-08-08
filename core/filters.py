@@ -15,10 +15,9 @@ class MedicineFilter(filters.FilterSet):
         model = Medicine
         fields = ['type','barcode']        
 
-class InventoryFilter(filters.FilterSet):
-    brand_name = filters.CharFilter(field_name='brand_name',lookup_expr='icontains',label='brand_name')
-    company = filters.CharFilter(field_name='company__name',lookup_expr='icontains',label='company')
+class InventoryFilter(MedicineFilter):
     ordering = filters.OrderingFilter(fields=('brand_name','quantity'))
+                                      
                                       
 class StockFilter(filters.FilterSet):
     date = filters.DateRangeFilter(field_name='time_stamp')

@@ -11,12 +11,13 @@ class StockListMixin:
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
 
+        
+        serializer = self.get_serializer(queryset, many=True)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
 
         value = queryset.aggregate(value=Coalesce(Sum(F('items__quantity')*F('items__price')),Value(0)))['value'] 
         data = {"data":serializer.data,"value":value}
@@ -33,7 +34,7 @@ class StockListMixin:
         for i,date in enumerate(dates):
             after_month = dates[i+1] if i < dates.count() - 1 else ""
             link = api_root + f'?since={date}&before={after_month}'
-            date = {str(date):link}
+            date = {'date':str(date),'link':link}
             data.append(date)
             
         return response.Response(data)
