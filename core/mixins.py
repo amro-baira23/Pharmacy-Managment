@@ -6,13 +6,11 @@ from rest_framework import mixins,viewsets,status
 
 from django.db.models import Sum,Q
 from django.http import FileResponse
-from .pdf.create_pdf import create_pdf
-
-from .models import EqualMedicine, Pharmacy
 from django.db.models.functions import Coalesce
 from django.db.models import Sum,F,Value
 
-from .models import *
+from .models import EqualMedicine, Pharmacy
+from .pdf.create_pdf import create_pdf
 
 class StockListMixin:
     def list(self, request, *args, **kwargs):
@@ -50,21 +48,17 @@ class StockListMixin:
     def report(self,request,**kwargs):
 
         order = self.get_object()
-        
         buffer = io.BytesIO()
-
-        data = []
-        for item in order.items.select_related("medicine").all():
-            data.append([item.medicine.brand_name,item.price,item.quantity,item.price * item.quantity])
         
         pharmacy = Pharmacy.objects.get(id=kwargs['pharmacy_pk'])
 
-        create_pdf(buffer,data,pharmacy,order.id)
+        create_pdf(buffer,pharmacy,order)
 
         buffer.seek(0)
 
-        return FileResponse(buffer,as_attachment=False,filename="report.pdf")
+        return FileResponse(buffer,as_attachment=False,filename=f"report#{order.id}.pdf")
 
+    
 
 class MultipleStockListMixin:
 
