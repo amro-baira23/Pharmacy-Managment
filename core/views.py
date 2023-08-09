@@ -3,7 +3,6 @@ from django.utils.translation import gettext as _
 from rest_framework import viewsets,response,status
 from rest_framework.decorators import action
 from django_filters import rest_framework as filters
-from drf_multiple_model.viewsets import ObjectMultipleModelAPIViewSet
 from rest_framework import viewsets,response,status,mixins
 
 from .models import *
@@ -356,21 +355,17 @@ class RetriveViewSet(StockListMixin,viewsets.ModelViewSet):
             return super().destroy(request, *args, **kwargs)
         
 
-class TransactionViewset(MultipleStockListMixin,ObjectMultipleModelAPIViewSet):
+class TransactionViewset(MultipleStockListMixin):
         filter_backends = (filters.DjangoFilterBackend,)
-        filterset_class = StockFilter
+        filterset_class = StockFilter 
         
         def get_querylist(self):
             querylist = [
-            {'queryset': Purchase.objects.all(), 'serializer_class': PurchaseListSerializer},
-            {'queryset': Sale.objects.all(), 'serializer_class': SaleListSerializer},
-            {'queryset': Returment.objects.all(), 'serializer_class': RetriveListSerializer},
-            {'queryset': Disposal.objects.all(), 'serializer_class': DisposalListSerializer},
+            {'queryset': Purchase.objects.all().filter(pharmacy_id=self.kwargs['pharmacy_pk'])},
+            {'queryset': Sale.objects.all().filter(pharmacy_id=self.kwargs['pharmacy_pk'])},
+            {'queryset': Returment.objects.all().filter(pharmacy_id=self.kwargs['pharmacy_pk'])},
             ]
-            for qs in querylist:
-                qs['queryset'] = qs['queryset'].filter(pharmacy_id=self.kwargs['pharmacy_pk'])
             return querylist
-
         
 
 class NotificationList(mixins.ListModelMixin,viewsets.GenericViewSet):
