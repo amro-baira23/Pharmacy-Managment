@@ -17,6 +17,7 @@ django-crispy-forms = "*"
 fcm-django = "*"
 django-q = "*"
 django-extensions = "*"
+reportlab = "*"
 
 [dev-packages]
 

@@ -5,6 +5,19 @@ from django.db.models.functions import Coalesce
 from django.db.models import Sum,F,Value
 
 from .models import *
+import io
+from rest_framework import response
+from rest_framework.decorators import action
+from rest_framework.reverse import reverse_lazy,reverse
+from rest_framework import mixins,viewsets,status
+
+from django.db.models import Sum,Q
+from django.http import FileResponse
+from django.db.models.functions import Coalesce
+from django.db.models import Sum,F,Value
+
+from .models import EqualMedicine, Pharmacy
+from .pdf.create_pdf import create_pdf
 
 class StockListMixin:
     def list(self, request, *args, **kwargs):
@@ -37,7 +50,22 @@ class StockListMixin:
             data.append(date)
             
         return response.Response(data)
+    
+    @action(detail=True,methods=['get'])
+    def report(self,request,**kwargs):
 
+        order = self.get_object()
+        buffer = io.BytesIO()
+        
+        pharmacy = Pharmacy.objects.get(id=kwargs['pharmacy_pk'])
+
+        create_pdf(buffer,pharmacy,order)
+
+        buffer.seek(0)
+
+        return FileResponse(buffer,as_attachment=False,filename=f"report#{order.id}.pdf")
+
+    
 
 class MultipleStockListMixin(mixins.ListModelMixin,viewsets.GenericViewSet):
 
@@ -83,3 +111,15 @@ class MultipleStockListMixin(mixins.ListModelMixin,viewsets.GenericViewSet):
     def get_queryset(self):
         return Purchase.objects.none()
         
+
+class ListCreateOnly(mixins.CreateModelMixin,
+                  mixins.ListModelMixin,
+                  viewsets.GenericViewSet
+                ):
+    
+    @action(detail=False,methods=['delete'])
+    def remove(self,request,**kwargs):
+        med_id = self.kwargs['medicine_pk']
+        fil = Q(medicine1__id = med_id) | Q(medicine2__id = med_id)
+        EqualMedicine.objects.filter(fil).delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
