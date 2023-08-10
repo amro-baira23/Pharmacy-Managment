@@ -3,6 +3,8 @@ from django.core.validators import MinLengthValidator
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
+from django.utils.timezone import localtime
+
 from .statics import *
 from .validators import validate_old_date
 
@@ -102,8 +104,7 @@ class Sale(models.Model):
         return self.seller.first_name
 
     def time(self):
-        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
-
+        return localtime(self.time_stamp).strftime(f"%Y-%m-%d %H:%m")
 
 class SaleItem(models.Model):
     medicine = models.ForeignKey(Medicine,related_name='sale_items',on_delete=models.PROTECT)
@@ -125,7 +126,7 @@ class Purchase(models.Model):
         return self.reciver.first_name
 
     def time(self):
-        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
+        return localtime(self.time_stamp).strftime(f"%Y-%m-%d %H:%m")
 
 
 class PurchaseItem(models.Model):
@@ -185,7 +186,7 @@ class Notification(models.Model):
     time_stamp = models.DateTimeField(auto_now_add=True)
 
     def time(self):
-        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
+        return localtime(self.time_stamp).strftime(f"%Y-%m-%d %H:%m")
 
 
 class Disposal(models.Model):
@@ -197,7 +198,7 @@ class Disposal(models.Model):
         return self.user.first_name
 
     def time(self):
-        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
+        return localtime(self.time_stamp).strftime(f"%Y-%m-%d %H:%m")
 
 
 class DisposedItem(models.Model):
@@ -220,7 +221,7 @@ class Returment(models.Model):
         return self.user.first_name
 
     def time(self):
-        return self.time_stamp.strftime(f"%Y-%m-%d %H:%m")
+        return localtime(self.time_stamp).strftime(f"%Y-%m-%d %H:%m")
 
 
 class ReturnedItem(models.Model):
