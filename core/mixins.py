@@ -75,19 +75,14 @@ class MultipleStockListMixin(mixins.ListModelMixin,viewsets.GenericViewSet):
         for query_data in querylist:
             query_data['queryset'] = self.filter_queryset(query_data['queryset'])
 
-        trans = ['purchase','sale','retrieve']
+        trans = ['purchases','sales','returns','disposals']
 
-        temp = {}
+        data = {}
         for i,qs in enumerate(querylist):
             qs = qs['queryset'].aggregate(value=Coalesce(Sum(
             F('items__quantity')*F('items__price')),Value(0)))
-            temp[trans[i]] = qs['value']
-
-        data = {}
-        data['income'] = temp['sale'] - temp['retrieve']
-        data['outcome'] = temp['purchase']
-        data['total_profit'] = data['income'] - data['outcome']
-
+            data[trans[i]] = qs['value']
+        data['total_profit'] = data['sales'] - (data['purchases'] + data['returns'])
         return response.Response(data)
     
 

@@ -366,10 +366,11 @@ class TransactionViewset(MultipleStockListMixin):
             {'queryset': Purchase.objects.all().filter(pharmacy_id=self.kwargs['pharmacy_pk'])},
             {'queryset': Sale.objects.all().filter(pharmacy_id=self.kwargs['pharmacy_pk'])},
             {'queryset': Returment.objects.all().filter(pharmacy_id=self.kwargs['pharmacy_pk'])},
+            {'queryset': Disposal.objects.all().filter(pharmacy_id=self.kwargs['pharmacy_pk'])},
             ]
             return querylist
         
-
+        
 class NotificationList(mixins.ListModelMixin,viewsets.GenericViewSet):
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
