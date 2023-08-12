@@ -634,7 +634,7 @@ class CompanySerializer(serializers.ModelSerializer):
 
 
 ## ########## MEDICINE ##########
-class MedicineListSerializer(serializers.ModelSerializer):
+class MedicineEqualListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Medicine
         fields = ['id','brand_name']
@@ -712,15 +712,3 @@ class EqualsCreateSerializer(serializers.ModelSerializer):
             EqualMedicine.objects.bulk_create(equals)
 
         return {}
-
-
-class EqualMedicineSerializer(serializers.ModelSerializer):
-    medicine = serializers.SerializerMethodField("get_medicine")
-    class Meta:
-        model = EqualMedicine
-        fields = ['medicine']
-
-    def get_medicine(self,EqualMedicine):
-        meds = Medicine.objects.filter(id=EqualMedicine.medicine)
-        ser = MedicineListSerializer(meds,many=True)
-        return ser.data

@@ -396,7 +396,7 @@ class EqualViewSet(ListCreateOnly):
     def get_serializer_class(self):
         if self.action == 'create':
             return EqualsCreateSerializer
-        return MedicineListSerializer
+        return MedicineEqualListSerializer
 
     def get_serializer_context(self):
         return {'medicine':int(self.kwargs['medicine_pk'])}

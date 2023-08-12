@@ -3,7 +3,10 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from custom.models import User
-from core.models import Pharmacy,UserRole,Shift,ShiftDay,Medicine,Company
+from core.models import Pharmacy,UserRole,Shift,ShiftDay,Medicine,Company,Purchase,PurchaseItem,Sale,SaleItem
+from core.models import Returment,ReturnedItem,Disposal,DisposedItem,Purchase,PurchaseItem,Sale,SaleItem
+
+from . import data
 
 import random
 
@@ -28,6 +31,10 @@ class Command(BaseCommand):
             both = User.objects.create_user("both@gmail.com","both","last","1231231284",1000,"1234awsd",pharmacy=ph,shift=shift)
             pharmacy_manager = User.objects.create_user("phmanager@gmail.com","phmanager","last","1231231236",1000,"1234awsd",pharmacy=ph,shift=shift)
             manager = User.objects.create_user("manager@gmail.com","manager","owner","1231271234",1000,"1234awsd",pharmacy=ph,shift=shift)
+            
+            User.objects.create_user("unactive1@gmail.com","unactive","user","0931234131",1000,"1234awsd",pharmacy=ph,shift=shift,is_active=False)
+            User.objects.create_user("unactive2@gmail.com","unactive2","user","0941234131",1000,"1234awsd",pharmacy=ph,shift=shift,is_active=False)
+            User.objects.create_user("unactive3@gmail.com","unactive3","user","0951234131",1000,"1234awsd",pharmacy=ph,shift=shift,is_active=False)
 
             UserRole.objects.bulk_create([
                     UserRole(role_id='manager',user=owner),
@@ -57,4 +64,34 @@ class Command(BaseCommand):
                 meds
             )            
 
-            print("Finished Seeding the data base")
+            purches = [Purchase(**item) for item in data.p_orders]
+
+            Purchase.objects.bulk_create(purches)
+
+            purches = [Disposal(**item) for item in data.r_orders]
+
+            Disposal.objects.bulk_create(purches)
+
+            purches = [Returment(**item) for item in data.r_orders]
+
+            Returment.objects.bulk_create(purches)
+
+            sales = [Sale(**item,doctor_name = random.choice(data.names),coustomer_name=random.choice(data.names)) for item in data.s_orders]
+
+            Sale.objects.bulk_create(sales)
+
+        with transaction.atomic():
+
+            sale_items = [SaleItem(**item) for item in data.sale_items]
+            pur_items = [PurchaseItem(**item) for item in data.pur_items]
+            ret_items = [ReturnedItem(**item) for item in data.ret_items]
+            dis_items = [DisposedItem(**item) for item in data.dis_item]
+
+            SaleItem.objects.bulk_create(sale_items)
+            PurchaseItem.objects.bulk_create(pur_items)
+            ReturnedItem.objects.bulk_create(ret_items)
+            DisposedItem.objects.bulk_create(dis_items)
+
+        
+        
+        print("Finished Seeding the data base")
